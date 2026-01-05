@@ -35,10 +35,13 @@ const SquarePayment = ({ onSuccess, bookingDetails }) => {
       <hr style={{border: '0', borderTop: '1px solid #eee', margin: '20px 0'}} />
 
       <PaymentForm
-        applicationId="sandbox-sq0idb-7q_dOjT-tu2YL5b5KSwwu9A"
-        locationId="LD7WCY7X0HQT4"
-        cardTokenizeResponseReceived={async (token, verifiedBuyer) => {
-          setIsSubmitting(true);
+      // src/components/SquarePayment.js (Updated Portion)
+  /* Replace your old ID with the new Sandbox ID provided */
+  applicationId="sandbox-sq0idb-7q_dOjTtu2YL5b5KSwwu9A"
+  locationId="LD7WCY7X0HQT4"
+  cardTokenizeResponseReceived={async (token, verifiedBuyer) => {
+    setIsSubmitting(true);
+    // ... rest of your existing logic
           try {
             const response = await fetch('http://localhost:5000/api/process-payment', {
               method: 'POST',
