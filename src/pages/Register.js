@@ -16,16 +16,19 @@ const Register = ({ setUser }) => {
         body: JSON.stringify(formData)
       });
       const data = await res.json();
+      
       if (res.ok) {
-        alert("Account created successfully!");
-        // Optional: Auto-login after registration
-        if (data.user && data.token) {
-          localStorage.setItem('user', JSON.stringify(data.user));
-          localStorage.setItem('token', data.token);
-          setUser(data.user);
-          navigate(data.user.role === 'driver' ? '/driver-dashboard' : '/dashboard');
-        } else {
+        if (formData.role === 'driver') {
+          alert("Registration Successful! Your chauffeur account is now PENDING APPROVAL. You will be notified once an admin activates your account.");
           navigate('/login');
+        } else {
+          alert("Account created successfully!");
+          if (data.user && data.token) {
+            localStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('token', data.token);
+            setUser(data.user);
+            navigate('/dashboard');
+          }
         }
       } else {
         alert(data.error || "Registration failed");
@@ -41,9 +44,9 @@ const Register = ({ setUser }) => {
     <div style={{ padding: '100px 20px', maxWidth: '400px', margin: '0 auto', color: '#fff', textAlign: 'center' }}>
       <h2 style={{ color: '#C5A059', marginBottom: '30px' }}>Join the Fleet</h2>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-        <input style={inputStyle} type="text" placeholder="Full Name" onChange={e => setFormData({...formData, name: e.target.value})} required />
-        <input style={inputStyle} type="email" placeholder="Email Address" onChange={e => setFormData({...formData, email: e.target.value})} required />
-        <input style={inputStyle} type="password" placeholder="Create Password" onChange={e => setFormData({...formData, password: e.target.value})} required />
+        <input style={inputStyle} name="name" type="text" placeholder="Full Name" onChange={e => setFormData({...formData, name: e.target.value})} required />
+        <input style={inputStyle} name="email" type="email" placeholder="Email Address" onChange={e => setFormData({...formData, email: e.target.value})} required />
+        <input style={inputStyle} name="password" type="password" placeholder="Create Password" onChange={e => setFormData({...formData, password: e.target.value})} required />
         
         <label style={{ textAlign: 'left', color: '#888', fontSize: '0.9rem' }}>Account Type:</label>
         <select style={inputStyle} value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}>
@@ -60,7 +63,7 @@ const Register = ({ setUser }) => {
   );
 };
 
-const inputStyle = { padding: '12px', background: '#111', border: '1px solid #333', color: '#fff', borderRadius: '4px' };
-const buttonStyle = { background: '#C5A059', color: '#000', padding: '15px', fontWeight: 'bold', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '10px' };
+const inputStyle = { padding: '12px', background: '#111', border: '1px solid #333', color: '#fff', borderRadius: '4px', width: '100%', boxSizing: 'border-box' };
+const buttonStyle = { background: '#C5A059', color: '#000', padding: '15px', fontWeight: 'bold', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '10px', width: '100%' };
 
 export default Register;
