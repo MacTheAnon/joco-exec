@@ -1,4 +1,5 @@
 const { SquareClient, SquareEnvironment } = require('square'); 
+const twilio = require('twilio');
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -7,6 +8,9 @@ const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
+
+// Initialize Twilio - Ensure SID and TOKEN are in your .env
+const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_TOKEN);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -103,28 +107,59 @@ app.get('/api/claim-job', (req, res) => {
 
 app.post('/api/process-payment', async (req, res) => {
   const { sourceId, amount, bookingDetails } = req.body;
+  
   try {
+    // 1. Process payment through Square
     const response = await squareClient.payments.create({
       sourceId, 
       idempotencyKey: Date.now().toString(),
       amountMoney: { amount, currency: 'USD' }
     });
-    const newBooking = { id: response.payment.id, ...bookingDetails, amount, driver: null, bookedAt: new Date() };
+
+    // 2. Save booking after payment
+    const newBooking = { 
+      id: response.payment.id, 
+      ...bookingDetails, 
+      amount, 
+      driver: null, 
+      bookedAt: new Date() 
+    };
     saveBooking(newBooking);
     
-    // Dispatch to Drivers
+    // 3. Notify Drivers via Email and Twilio
     const drivers = (process.env.DRIVER_EMAILS || "").split(',');
-    drivers.forEach(d => {
-      const link = `${BASE_URL}/api/claim-job?id=${newBooking.id}&driver=${d.trim()}`;
+    
+    drivers.forEach(async (d) => {
+      const driverTarget = d.trim();
+      const claimLink = `${BASE_URL}/api/claim-job?id=${newBooking.id}&driver=${driverTarget}`;
+
+      // Email Dispatch
       transporter.sendMail({
-        from: '"JOCO" <'+process.env.EMAIL_USER+'>', to: d.trim(),
+        from: `"JOCO" <${process.env.EMAIL_USER}>`, 
+        to: driverTarget,
         subject: `NEW JOB: ${newBooking.date}`,
-        html: `<p>${newBooking.pickup} -> ${newBooking.dropoff}</p><a href="${link}" style="padding:10px; background:gold; color:black; text-decoration:none;">ACCEPT JOB</a>`
+        html: `<p>Route: ${newBooking.pickup} -> ${newBooking.dropoff}</p>
+               <a href="${claimLink}" style="padding:10px; background:gold; color:black; text-decoration:none;">ACCEPT JOB</a>`
       });
+
+      // Twilio SMS Dispatch (only if it's a phone number and not an email)
+      if (!driverTarget.includes('@') && process.env.TWILIO_PHONE) {
+        try {
+          await twilioClient.messages.create({
+            body: `JOCO EXEC: New Job from ${newBooking.pickup}. Claim: ${claimLink}`,
+            from: process.env.TWILIO_PHONE,
+            to: driverTarget
+          });
+        } catch (smsErr) {
+          console.error("SMS Dispatch Error:", smsErr.message);
+        }
+      }
     });
+
     res.json({ success: true });
+
   } catch (e) { 
-    console.error(e);
+    console.error("Payment Error:", e);
     res.status(500).json({ error: e.message }); 
   }
 });
