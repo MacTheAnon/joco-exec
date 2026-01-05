@@ -7,7 +7,7 @@ const SquarePayment = ({ onSuccess, bookingDetails }) => {
 
   const paymentOptions = [
     { label: "Sedan - Trip Minimum ($75)", value: 7500 },
-    { label: "SUV - Trip Minimum ($75)", value: 7500 },
+    { label: "SUV - Trip Minimum ($95)", value: 7500 },
     { label: "Night Out - Minimum ($150)", value: 15000 },
   ];
 
