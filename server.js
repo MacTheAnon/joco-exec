@@ -9,7 +9,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
-// Initialize Twilio - Ensure SID and TOKEN are in your .env
+// Initialize Twilio
 const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_TOKEN);
 
 const app = express();
@@ -69,8 +69,12 @@ app.post('/api/auth/register', async (req, res) => {
   const users = getUsers();
   if (users.find(u => u.email === email)) return res.status(400).json({ error: "Email exists" });
   const hashedPassword = await bcrypt.hash(password, 10);
-  saveUser({ id: Date.now().toString(), name, email, password: hashedPassword, role: role || 'customer' });
-  res.json({ success: true });
+  const newUser = { id: Date.now().toString(), name, email, password: hashedPassword, role: role || 'customer' };
+  saveUser(newUser);
+  
+  // Create token so they are logged in immediately after registering
+  const token = jwt.sign({ id: newUser.id, email: newUser.email, role: newUser.role, name: newUser.name }, SECRET_KEY, { expiresIn: '1d' });
+  res.json({ success: true, token, user: { name: newUser.name, role: newUser.role, email: newUser.email } });
 });
 
 app.post('/api/auth/login', async (req, res) => {
@@ -109,8 +113,7 @@ app.post('/api/process-payment', async (req, res) => {
   const { sourceId, amount, bookingDetails } = req.body;
   
   try {
-    // 1. Process payment through Square
-    // FIX: Latest Square SDK requires amount to be a BigInt
+    // 1. Process payment through Square (BigInt Fix)
     const response = await squareClient.payments.create({
       sourceId, 
       idempotencyKey: Date.now().toString(),
@@ -137,7 +140,6 @@ app.post('/api/process-payment', async (req, res) => {
       const driverTarget = d.trim();
       const claimLink = `${BASE_URL}/api/claim-job?id=${newBooking.id}&driver=${driverTarget}`;
 
-      // Email Dispatch
       transporter.sendMail({
         from: `"JOCO" <${process.env.EMAIL_USER}>`, 
         to: driverTarget,
@@ -146,7 +148,6 @@ app.post('/api/process-payment', async (req, res) => {
                <a href="${claimLink}" style="padding:10px; background:gold; color:black; text-decoration:none;">ACCEPT JOB</a>`
       });
 
-      // Twilio SMS Dispatch
       if (!driverTarget.includes('@') && process.env.TWILIO_PHONE) {
         try {
           await twilioClient.messages.create({
@@ -154,9 +155,7 @@ app.post('/api/process-payment', async (req, res) => {
             from: process.env.TWILIO_PHONE,
             to: driverTarget
           });
-        } catch (smsErr) {
-          console.error("SMS Dispatch Error:", smsErr.message);
-        }
+        } catch (smsErr) { console.error("SMS Error:", smsErr.message); }
       }
     });
 
@@ -168,15 +167,23 @@ app.post('/api/process-payment', async (req, res) => {
   }
 });
 
+// --- 6. ADMIN ROUTES ---
 app.get('/api/admin/bookings', (req, res) => {
   if (req.headers['authorization'] !== 'my-secret-admin-password') return res.status(401).send();
   res.json(getBookings());
 });
 
-// --- 6. SERVE FRONTEND (Express 5.0 Fix) ---
+app.delete('/api/admin/bookings/:id', (req, res) => {
+  if (req.headers['authorization'] !== 'my-secret-admin-password') return res.status(401).send();
+  const { id } = req.params;
+  const updatedBookings = getBookings().filter(b => b.id !== id);
+  fs.writeFileSync(DB_FILE, JSON.stringify(updatedBookings, null, 2));
+  res.json({ success: true });
+});
+
+// --- 7. SERVE FRONTEND (Express 5.0 Fix) ---
 app.use(express.static(path.join(__dirname, 'build')));
 
-// Named wildcard required for Express 5.0
 app.get('/*path', (req, res) => {
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });

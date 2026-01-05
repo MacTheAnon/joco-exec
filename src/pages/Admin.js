@@ -27,6 +27,17 @@ const Admin = () => {
     }
   };
 
+  const deleteBooking = async (id) => {
+  if (window.confirm("Are you sure you want to delete this booking?")) {
+    const res = await fetch(`/api/admin/bookings/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'my-secret-admin-password' }
+    });
+    if (res.ok) {
+      setBookings(bookings.filter(b => b.id !== id));
+    }
+  }
+};
   // --- CHART LOGIC: Last 7 Days Revenue ---
   const getChartData = () => {
     if (!bookings) return [];
@@ -101,13 +112,14 @@ const Admin = () => {
       <div style={{overflowX: 'auto', background: '#fff', borderRadius: '8px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)'}}>
         <table style={{width: '100%', borderCollapse: 'collapse'}}>
           <thead>
-            <tr style={{background: '#111', color: '#C5A059', textAlign: 'left'}}>
-              <th style={{padding: '15px'}}>Trip Info</th>
-              <th style={{padding: '15px'}}>Route</th>
-              <th style={{padding: '15px'}}>Status</th>
-              <th style={{padding: '15px'}}>Fare</th>
-            </tr>
-          </thead>
+         <tr style={{background: '#111', color: '#C5A059', textAlign: 'left'}}>
+    <th style={{padding: '15px'}}>Trip Info</th>
+    <th style={{padding: '15px'}}>Route</th>
+    <th style={{padding: '15px'}}>Status</th>
+    <th style={{padding: '15px'}}>Fare</th>
+    <th style={{padding: '15px'}}>Actions</th> {/* Move it inside the TR */}
+  </tr>
+     </thead>
           <tbody>
             {filteredBookings.map((job) => (
               <tr key={job.id} style={{borderBottom: '1px solid #eee'}}>
