@@ -8,6 +8,8 @@ const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
+console.log("✅ Admin Password Loaded:", process.env.ADMIN_SECRET_PASSWORD ? "YES" : "NO");
+console.log("✅ Square Token Loaded:", process.env.SQUARE_ACCESS_TOKEN ? "YES" : "NO");
 
 const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_TOKEN);
 const app = express();
@@ -168,7 +170,19 @@ app.delete('/api/admin/bookings/:id', (req, res) => {
   fs.writeFileSync(DB_FILE, JSON.stringify(updatedBookings, null, 2));
   res.json({ success: true });
 });
-
+app.get('/api/claim-job', (req, res) => {
+  const { id, driver } = req.query;
+  const bookings = getBookings();
+  const job = bookings.find(b => b.id === id);
+  
+  if (!job) return res.send("Job not found.");
+  if (job.driver) return res.send("This job has already been claimed.");
+  
+  job.driver = driver; // This MUST match the driver's login email
+  updateBooking(job);
+  
+  res.send("<h1>Job Claimed Successfully!</h1><p>It will now appear in your Driver Dashboard.</p>");
+});
 // --- SERVE FRONTEND ---
 app.use(express.static(path.join(__dirname, 'build')));
 app.get('/*path', (req, res) => { res.sendFile(path.join(__dirname, 'build', 'index.html')); });

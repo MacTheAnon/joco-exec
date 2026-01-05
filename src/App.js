@@ -5,7 +5,7 @@ import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-ro
 import Home from './pages/Home';
 import Booking from './pages/Booking';
 import Login from './pages/Login';
-import Register from './pages/Register'; // <-- NEW: Added Register import
+import Register from './pages/Register'; 
 import Dashboard from './pages/Dashboard';
 import DriverDashboard from './pages/DriverDashboard';
 import Admin from './pages/Admin';
@@ -98,13 +98,14 @@ function App() {
         </nav>
 
         {/* --- ROUTES --- */}
+        
         <div style={{flex: 1}}>
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Home />} />
             <Route path="/booking" element={<Booking />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} /> {/* <-- NEW: Added Register Route */}
+            <Route path="/register" element={<Register />} /> 
 
             {/* Legal Routes */}
             <Route path="/privacy" element={<Privacy />} />
