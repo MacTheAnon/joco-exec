@@ -8,6 +8,8 @@ const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
+
+// Debug logs to verify your .env is working
 console.log("✅ Admin Password Loaded:", process.env.ADMIN_SECRET_PASSWORD ? "YES" : "NO");
 console.log("✅ Square Token Loaded:", process.env.SQUARE_ACCESS_TOKEN ? "YES" : "NO");
 
@@ -24,7 +26,7 @@ app.use(express.json());
 
 const squareClient = new SquareClient({
   token: process.env.SQUARE_ACCESS_TOKEN, 
-  environment: SquareEnvironment.Sandbox, 
+  environment: SquareEnvironment.Sandbox, // Change to .Production for real money
 });
 
 const transporter = nodemailer.createTransport({
@@ -59,29 +61,21 @@ const createGoogleCalLink = (b) => {
 // --- AUTH ROUTES ---
 app.post('/api/auth/register', async (req, res) => {
   const { name, email, password, role } = req.body;
-
-  // BLOCK ADMIN REGISTRATION
-  if (role === 'admin') {
-    return res.status(403).json({ error: "Restricted role. Admin accounts cannot be created publicly." });
-  }
+  if (role === 'admin') return res.status(403).json({ error: "Restricted role." });
 
   const users = getUsers();
   if (users.find(u => u.email === email)) return res.status(400).json({ error: "Email exists" });
   
   const hashedPassword = await bcrypt.hash(password, 10);
-  
   const newUser = { 
     id: Date.now().toString(), 
-    name, 
-    email, 
-    password: hashedPassword, 
+    name, email, password: hashedPassword, 
     role: role || 'customer',
     isApproved: role === 'driver' ? false : true 
   };
   
   saveUser(newUser);
-  
-  const token = jwt.sign({ id: newUser.id, email: newUser.email, role: newUser.role, name: newUser.name }, SECRET_KEY, { expiresIn: '1d' });
+  const token = jwt.sign({ id: newUser.id, email: newUser.email, role: newUser.role }, SECRET_KEY, { expiresIn: '1d' });
   res.json({ success: true, token, user: { name: newUser.name, role: newUser.role, email: newUser.email, isApproved: newUser.isApproved } });
 });
 
@@ -90,11 +84,11 @@ app.post('/api/auth/login', async (req, res) => {
   const user = getUsers().find(u => u.email === email);
   if (!user || !(await bcrypt.compare(password, user.password))) return res.status(400).json({ error: "Invalid credentials" });
   
-  const token = jwt.sign({ id: user.id, email: user.email, role: user.role, name: user.name, isApproved: user.isApproved }, SECRET_KEY, { expiresIn: '1d' });
+  const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, SECRET_KEY, { expiresIn: '1d' });
   res.json({ token, user: { name: user.name, role: user.role, email: user.email, isApproved: user.isApproved } });
 });
 
-// --- DISPATCH LOGIC ---
+// --- DISPATCH & PAYMENT ---
 app.post('/api/process-payment', async (req, res) => {
   const { sourceId, amount, bookingDetails } = req.body;
   try {
@@ -108,12 +102,11 @@ app.post('/api/process-payment', async (req, res) => {
     saveBooking(newBooking);
     
     const approvedDrivers = getUsers().filter(u => u.role === 'driver' && u.isApproved === true);
-
     approvedDrivers.forEach(async (driver) => {
       const claimLink = `${BASE_URL}/api/claim-job?id=${newBooking.id}&driver=${driver.email}`;
       
       transporter.sendMail({
-        from: `"JOCO" <${process.env.EMAIL_USER}>`, 
+        from: `"JOCO EXEC" <${process.env.EMAIL_USER}>`, 
         to: driver.email,
         subject: `NEW JOB: ${newBooking.date}`,
         html: `<p>Route: ${newBooking.pickup} -> ${newBooking.dropoff}</p><a href="${claimLink}" style="padding:10px; background:gold; color:black; text-decoration:none;">ACCEPT JOB</a>`
@@ -133,22 +126,36 @@ app.post('/api/process-payment', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- ADMIN ROUTES (SECURED WITH ENV PASSWORD) ---
+// --- DRIVER ENDPOINTS ---
+app.get('/api/user/my-bookings', (req, res) => {
+  try {
+    const token = req.headers['authorization'];
+    const decoded = jwt.verify(token, SECRET_KEY);
+    const trips = getBookings().filter(b => b.driver === decoded.email);
+    res.json(trips);
+  } catch (e) { res.status(401).send(); }
+});
 
+app.get('/api/claim-job', (req, res) => {
+  const { id, driver } = req.query;
+  const bookings = getBookings();
+  const job = bookings.find(b => b.id === id);
+  if (!job || job.driver) return res.send("Job unavailable or already claimed.");
+  job.driver = driver;
+  updateBooking(job);
+  res.send(`<h1>Job Claimed!</h1><p>It is now in your portal.</p><a href="${createGoogleCalLink(job)}">Add to Calendar</a>`);
+});
+
+// --- ADMIN ROUTES ---
 app.get('/api/admin/users', (req, res) => {
-  if (req.headers['authorization'] !== process.env.ADMIN_SECRET_PASSWORD) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
+  if (req.headers['authorization'] !== process.env.ADMIN_SECRET_PASSWORD) return res.status(401).send();
   res.json(getUsers());
 });
 
 app.post('/api/admin/approve-driver', (req, res) => {
-  if (req.headers['authorization'] !== process.env.ADMIN_SECRET_PASSWORD) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-  const { email } = req.body;
+  if (req.headers['authorization'] !== process.env.ADMIN_SECRET_PASSWORD) return res.status(401).send();
   const users = getUsers().map(u => {
-    if (u.email === email) u.isApproved = true;
+    if (u.email === req.body.email) u.isApproved = true;
     return u;
   });
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
@@ -156,35 +163,19 @@ app.post('/api/admin/approve-driver', (req, res) => {
 });
 
 app.get('/api/admin/bookings', (req, res) => {
-  if (req.headers['authorization'] !== process.env.ADMIN_SECRET_PASSWORD) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
+  if (req.headers['authorization'] !== process.env.ADMIN_SECRET_PASSWORD) return res.status(401).send();
   res.json(getBookings());
 });
 
 app.delete('/api/admin/bookings/:id', (req, res) => {
-  if (req.headers['authorization'] !== process.env.ADMIN_SECRET_PASSWORD) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-  const updatedBookings = getBookings().filter(b => b.id !== req.params.id);
-  fs.writeFileSync(DB_FILE, JSON.stringify(updatedBookings, null, 2));
+  if (req.headers['authorization'] !== process.env.ADMIN_SECRET_PASSWORD) return res.status(401).send();
+  const updated = getBookings().filter(b => b.id !== req.params.id);
+  fs.writeFileSync(DB_FILE, JSON.stringify(updated, null, 2));
   res.json({ success: true });
 });
-app.get('/api/claim-job', (req, res) => {
-  const { id, driver } = req.query;
-  const bookings = getBookings();
-  const job = bookings.find(b => b.id === id);
-  
-  if (!job) return res.send("Job not found.");
-  if (job.driver) return res.send("This job has already been claimed.");
-  
-  job.driver = driver; // This MUST match the driver's login email
-  updateBooking(job);
-  
-  res.send("<h1>Job Claimed Successfully!</h1><p>It will now appear in your Driver Dashboard.</p>");
-});
+
 // --- SERVE FRONTEND ---
 app.use(express.static(path.join(__dirname, 'build')));
 app.get('/*path', (req, res) => { res.sendFile(path.join(__dirname, 'build', 'index.html')); });
 
-app.listen(PORT, () => console.log(`🚀 JOCO EXEC Live on ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 JOCO EXEC running on port ${PORT}`));

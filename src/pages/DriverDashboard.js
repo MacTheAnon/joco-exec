@@ -3,64 +3,90 @@ import React, { useState, useEffect } from 'react';
 const DriverDashboard = () => {
   const [myJobs, setMyJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const user = JSON.parse(localStorage.getItem('user'));
 
   useEffect(() => {
     const fetchJobs = async () => {
       try {
+        const token = localStorage.getItem('token');
         const res = await fetch('http://localhost:5000/api/user/my-bookings', {
-          headers: { 'Authorization': localStorage.getItem('token') }
+          headers: { 'Authorization': token }
         });
+        
+        if (!res.ok) throw new Error("Could not fetch jobs");
+        
         const data = await res.json();
         setMyJobs(data);
       } catch (err) {
-        console.error("Failed to fetch jobs");
+        setError('Unable to load schedule. Check your connection.');
       } finally {
         setLoading(false);
       }
     };
-    fetchJobs();
-  }, []);
+    if (user?.isApproved) fetchJobs();
+    else setLoading(false);
+  }, [user]);
 
+  // --- 1. Pending Approval View ---
   if (!user?.isApproved) {
     return (
-      <div style={{ padding: '100px 20px', textAlign: 'center', color: '#fff', background: '#000', minHeight: '80vh' }}>
-        <h2 style={{ color: '#C5A059' }}>Account Pending Approval</h2>
-        <p style={{ color: '#888' }}>Your chauffeur credentials are being reviewed. You will see jobs here once approved by Admin.</p>
+      <div style={{ padding: '80px 20px', textAlign: 'center', color: '#fff', background: '#000', minHeight: '90vh' }}>
+        <div style={{ maxWidth: '400px', margin: '0 auto', border: '1px solid #C5A059', padding: '30px', borderRadius: '8px' }}>
+          <h2 style={{ color: '#C5A059' }}>Account Pending</h2>
+          <p style={{ color: '#888', lineHeight: '1.6' }}>
+            Welcome, {user?.name}. Your chauffeur credentials are currently under review. 
+            Once approved by the JOCO Admin, you will receive trip alerts here.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: '40px 20px', background: '#000', color: '#fff', minHeight: '100vh' }}>
-      <h1 style={{ color: '#C5A059' }}>Driver Portal</h1>
-      <p style={{ marginBottom: '30px' }}>Logged in as: <strong>{user.name}</strong></p>
+    <div style={{ padding: '20px', background: '#000', color: '#fff', minHeight: '100vh' }}>
+      <div style={{ borderBottom: '1px solid #222', paddingBottom: '20px', marginBottom: '30px' }}>
+        <h1 style={{ color: '#C5A059', margin: 0 }}>Driver Portal</h1>
+        <p style={{ color: '#888' }}>Dispatcher active for: <strong>{user.email}</strong></p>
+      </div>
 
       {loading ? (
-        <p>Loading your schedule...</p>
+        <p>Loading trips...</p>
+      ) : error ? (
+        <p style={{ color: '#ff4d4d' }}>{error}</p>
       ) : myJobs.length === 0 ? (
-        <div style={{ padding: '40px', border: '1px dashed #444', textAlign: 'center' }}>
-          <p style={{ color: '#888' }}>No active trips assigned to you yet.</p>
+        <div style={{ textAlign: 'center', padding: '60px 20px', border: '1px dashed #333' }}>
+          <p style={{ color: '#888' }}>No active trips claimed yet.</p>
+          <p style={{ fontSize: '0.9rem' }}>Check your email/SMS for new dispatch alerts.</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gap: '20px' }}>
+        <div style={{ display: 'grid', gap: '20px', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
           {myJobs.map(job => (
-            <div key={job.id} style={{ background: '#111', padding: '20px', borderLeft: '5px solid #C5A059', borderRadius: '4px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{job.date} @ {job.time}</span>
-                <span style={{ color: '#C5A059', fontWeight: 'bold' }}>${(job.amount / 100).toFixed(2)}</span>
-              </div>
-              
-              <p style={{ margin: '5px 0' }}><strong>Client:</strong> {job.name}</p>
-              <p style={{ margin: '5px 0', color: '#ccc' }}><strong>Pickup:</strong> {job.pickup}</p>
-              <p style={{ margin: '5px 0', color: '#ccc' }}><strong>Dropoff:</strong> {job.dropoff}</p>
+            <div key={job.id} style={{ background: '#111', borderRadius: '8px', borderLeft: '5px solid #C5A059', overflow: 'hidden' }}>
+              <div style={{ padding: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>{job.date} @ {job.time}</span>
+                  <span style={{ color: '#C5A059', fontWeight: 'bold' }}>${(job.amount / 100).toFixed(2)}</span>
+                </div>
 
-              <div style={{ marginTop: '15px', display: 'flex', gap: '10px' }}>
+                <div style={{ fontSize: '0.95rem', color: '#ccc', marginBottom: '15px' }}>
+                  <p style={{ margin: '5px 0' }}><strong>Passenger:</strong> {job.name}</p>
+                  <p style={{ margin: '5px 0' }}><strong>Phone:</strong> <a href={`tel:${job.phone}`} style={{ color: '#C5A059' }}>{job.phone}</a></p>
+                </div>
+
+                <div style={{ background: '#000', padding: '10px', borderRadius: '4px', fontSize: '0.85rem', marginBottom: '15px' }}>
+                  <p style={{ margin: '0 0 5px 0' }}>📍 {job.pickup}</p>
+                  <p style={{ margin: 0 }}>🏁 {job.dropoff}</p>
+                </div>
+
                 <a 
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.pickup)}`}
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.pickup)}`}
                   target="_blank" 
                   rel="noreferrer"
-                  style={{ background: '#C5A059', color: '#000', padding: '8px 15px', textDecoration: 'none', fontWeight: 'bold', fontSize: '0.9rem' }}
+                  style={{
+                    display: 'block', background: '#C5A059', color: '#000', textAlign: 'center', 
+                    padding: '12px', borderRadius: '4px', textDecoration: 'none', fontWeight: 'bold'
+                  }}
                 >
                   NAVIGATE TO PICKUP
                 </a>
