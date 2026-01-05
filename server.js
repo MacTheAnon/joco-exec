@@ -240,11 +240,10 @@ app.delete('/api/admin/bookings/:id', (req, res) => {
 // --- SERVE FRONTEND (STATIC FILES) ---
 app.use(express.static(path.join(__dirname, 'build')));
 
-// Catch-all route to serve React Index
-app.get('/*', (req, res) => { 
-  res.sendFile(path.join(__dirname, 'build', 'index.html')); 
+// Using a Regex catch-all to satisfy Node v22 stricter path-to-regexp rules
+app.get(/^(?!\/api).+/, (req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
-
 // BIND TO 0.0.0.0 TO ALLOW EXTERNAL CONNECTIONS (IPHONE)
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 JOCO EXEC running on port ${PORT}`);
