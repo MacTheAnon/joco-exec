@@ -5,6 +5,7 @@
   "private": true,
   "dependencies": {
     "@ctrl/react-adsense": "^1.0.0",
+    "@googlemaps/google-maps-services-js": "^3.4.2",
     "@react-google-maps/api": "^2.20.8",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",

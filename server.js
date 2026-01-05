@@ -216,7 +216,22 @@ app.delete('/api/admin/bookings/:id', (req, res) => {
 // --- SERVE FRONTEND ---
 app.use(express.static(path.join(__dirname, 'build')));
 app.get('/*path', (req, res) => { res.sendFile(path.join(__dirname, 'build', 'index.html')); });
-
+// --- AVAILABILITY CHECK ---
+app.post('/api/check-availability', (req, res) => {
+  try {
+    const { date, time } = req.body;
+    const bookings = getBookings();
+    
+    // Checks if there is already a booking at that date and time
+    const isTaken = bookings.some(b => b.date === date && b.time === time);
+    
+    console.log(`🔍 Checking availability for ${date} @ ${time}: ${isTaken ? 'TAKEN' : 'AVAILABLE'}`);
+    
+    res.json({ available: !isTaken });
+  } catch (err) {
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 // BIND TO 0.0.0.0 TO ALLOW EXTERNAL CONNECTIONS (IPHONE)
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 JOCO EXEC running on port ${PORT}`);
