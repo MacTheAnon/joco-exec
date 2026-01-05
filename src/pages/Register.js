@@ -10,8 +10,9 @@ const Register = ({ setUser }) => {
     e.preventDefault();
     setLoading(true);
     try {
-      // NOTE: We use the full URL to ensure it hits your backend port correctly
-      const res = await fetch('http://localhost:5000/api/auth/register', {
+      // Use Environment Variable
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${apiUrl}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -97,7 +98,6 @@ const Register = ({ setUser }) => {
   );
 };
 
-// Mobile-first helper styles
 const mobileInput = { 
   padding: '14px', 
   background: '#111', 
@@ -106,7 +106,7 @@ const mobileInput = {
   borderRadius: '4px', 
   width: '100%', 
   boxSizing: 'border-box',
-  fontSize: '16px' // Critical: Prevents iOS zoom-in on focus
+  fontSize: '16px' 
 };
 
 export default Register;

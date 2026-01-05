@@ -20,7 +20,9 @@ const BookingForm = ({ onSubmit }) => {
     setChecking(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/check-availability', {
+      // Use Environment Variable
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/check-availability`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: formData.date, time: formData.time }),
@@ -45,11 +47,9 @@ const BookingForm = ({ onSubmit }) => {
       <h2 style={{color: '#C5A059', textAlign: 'center', marginTop: 0, fontSize: '1.5rem'}}>Request a Ride</h2>
       
       <form onSubmit={handleSubmit}>
-        {/* CONTACT INFO */}
         <label style={labelStyle}>Full Name</label>
         <input type="text" name="name" style={mobileInputStyle} onChange={handleChange} placeholder="John Doe" required />
         
-        {/* Responsive Grid for Email/Phone */}
         <div style={responsiveGrid}>
            <div style={{flex:1}}>
              <label style={labelStyle}>Email</label>
@@ -61,7 +61,6 @@ const BookingForm = ({ onSubmit }) => {
            </div>
         </div>
 
-        {/* DATE & TIME */}
         <div style={responsiveGrid}>
           <div style={{flex: 1}}>
             <label style={labelStyle}>Date</label>
@@ -87,11 +86,7 @@ const BookingForm = ({ onSubmit }) => {
   );
 };
 
-// --- MOBILE-OPTIMIZED STYLES ---
-
 const isMobile = window.innerWidth < 600;
-
-
 
 const formCardStyle = {
   background: '#111', 
@@ -122,7 +117,7 @@ const mobileInputStyle = {
   color: '#fff', 
   borderRadius: '6px', 
   boxSizing: 'border-box',
-  fontSize: '16px', // PREVENTS iOS ZOOM
+  fontSize: '16px', 
   fontFamily: 'inherit'
 };
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
 
 const Admin = () => {
   const [password, setPassword] = useState('');
@@ -8,17 +9,26 @@ const Admin = () => {
   const [activeTab, setActiveTab] = useState('bookings'); 
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedMarker, setSelectedMarker] = useState(null);
+  const [markers, setMarkers] = useState([]);
+
+  // Use the central API URL logic
+  const apiUrl = process.env.REACT_APP_API_URL || 'http://192.168.1.4:5000';
+
+  // Google Maps Loader
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_KEY
+  });
 
   const fetchData = async (e) => {
     if (e) e.preventDefault();
     try {
-      // Fetch Bookings
-      const bookRes = await fetch('http://localhost:5000/api/admin/bookings', {
+      const bookRes = await fetch(`${apiUrl}/api/admin/bookings`, {
         headers: { 'Authorization': password }
       });
       
-      // Fetch Users
-      const userRes = await fetch('http://localhost:5000/api/admin/users', {
+      const userRes = await fetch(`${apiUrl}/api/admin/users`, {
         headers: { 'Authorization': password }
       });
 
@@ -37,9 +47,23 @@ const Admin = () => {
     }
   };
 
+  // Turn saved coordinates into Map Pins
+  useEffect(() => {
+    if (bookings) {
+      const validMarkers = bookings
+        .filter(job => job.coords)
+        .map(job => ({
+          id: job.id,
+          pos: job.coords,
+          details: job
+        }));
+      setMarkers(validMarkers);
+    }
+  }, [bookings]);
+
   const deleteBooking = async (id) => {
     if (window.confirm("Are you sure you want to delete this booking?")) {
-      const res = await fetch(`http://localhost:5000/api/admin/bookings/${id}`, {
+      const res = await fetch(`${apiUrl}/api/admin/bookings/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': password }
       });
@@ -50,7 +74,7 @@ const Admin = () => {
   };
 
   const approveDriver = async (email) => {
-    const res = await fetch('http://localhost:5000/api/admin/approve-driver', {
+    const res = await fetch(`${apiUrl}/api/admin/approve-driver`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
@@ -75,74 +99,119 @@ const Admin = () => {
     return last7Days.map(date => {
       const dayTotal = bookings
         .filter(b => b.date === date)
-        .reduce((sum, b) => sum + (b.amount / 100), 0);
+        .reduce((sum, b) => sum + (Number(b.amount) / 100), 0);
       return { day: date.split('-').slice(1).join('/'), revenue: dayTotal };
     });
   };
+
+  // --- KPI CALCULATIONS ---
+  const totalRevenue = bookings ? bookings.reduce((sum, b) => sum + (Number(b.amount) / 100), 0) : 0;
+  const driverCount = users.filter(u => u.role === 'driver' && u.isApproved).length;
 
   const filteredBookings = bookings ? bookings.filter(job => 
     job.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     job.pickup.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (job.driver && job.driver.toLowerCase().includes(searchTerm.toLowerCase()))
-  ) : [];
+  ).sort((a,b) => new Date(b.date) - new Date(a.date)) : [];
 
-  // --- LOGIN VIEW ---
   if (!bookings) {
     return (
-      <div style={{minHeight: '90vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#111', padding: '20px'}}>
-        <h1 style={{color: '#C5A059', textAlign: 'center'}}>JOCO EXEC Dispatch</h1>
-        <form onSubmit={fetchData} style={{display: 'flex', flexDirection: 'column', gap: '15px', width: '100%', maxWidth: '320px', background: '#1a1a1a', padding: '30px', borderRadius: '8px'}}>
+      <div style={loginOverlay}>
+        <h1 style={{color: '#C5A059', textAlign: 'center', letterSpacing: '2px'}}>JOCO EXEC DISPATCH</h1>
+        <form onSubmit={fetchData} style={loginCard}>
           <input 
             type="password" 
             placeholder="Admin Password" 
             value={password} 
             onChange={(e) => setPassword(e.target.value)} 
-            style={{padding: '15px', background: '#000', color: '#fff', border: '1px solid #444', fontSize: '16px'}} 
+            style={loginInput} 
           />
-          <button type="submit" style={{padding: '15px', background: '#C5A059', fontWeight: 'bold', border: 'none', cursor: 'pointer', fontSize: '16px'}}>ACCESS FLEET DATA</button>
+          <button type="submit" style={loginBtn}>ACCESS FLEET DATA</button>
         </form>
         {error && <p style={{color: '#ff4d4d', marginTop: '15px'}}>{error}</p>}
       </div>
     );
   }
 
-  // --- MAIN ADMIN VIEW ---
   return (
-    <div style={{padding: '20px', minHeight: '100vh', background: '#f8f9fa'}}>
-      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px'}}>
-        <h1 style={{fontSize: '1.5rem', margin: 0}}>Fleet Control</h1>
-        <button onClick={() => setBookings(null)} style={{background: '#333', color: '#fff', padding: '10px 15px', border: 'none', borderRadius: '4px', cursor: 'pointer'}}>Log Out</button>
+    <div style={{padding: '20px', minHeight: '100vh', background: '#f8f9fa', maxWidth: '1200px', margin: '0 auto'}}>
+      
+      {/* HEADER */}
+      <div style={headerNav}>
+        <div>
+          <h1 style={{fontSize: '1.8rem', margin: 0, fontWeight: '800'}}>Fleet Control</h1>
+          <p style={{color: '#888', margin: 0}}>Operational Analytics & Dispatch</p>
+        </div>
+        <button onClick={() => setBookings(null)} style={logoutBtn}>Log Out</button>
+      </div>
+
+      {/* QUICK STATS CARDS */}
+      <div style={statsGrid}>
+        <div style={statCard}>
+          <span style={statLabel}>Total Revenue</span>
+          <h2 style={statValue}>${totalRevenue.toLocaleString()}</h2>
+        </div>
+        <div style={statCard}>
+          <span style={statLabel}>Active Bookings</span>
+          <h2 style={statValue}>{bookings.length}</h2>
+        </div>
+        <div style={statCard}>
+          <span style={statLabel}>Approved Chauffeurs</span>
+          <h2 style={statValue}>{driverCount}</h2>
+        </div>
       </div>
 
       {/* TABS */}
-      <div style={{display: 'flex', gap: '10px', marginBottom: '25px', flexWrap: 'wrap'}}>
-        <button 
-          onClick={() => setActiveTab('bookings')} 
-          style={activeTab === 'bookings' ? activeTabStyle : inactiveTabStyle}
-        >
-          Trip Schedule
-        </button>
-        <button 
-          onClick={() => setActiveTab('drivers')} 
-          style={activeTab === 'drivers' ? activeTabStyle : inactiveTabStyle}
-        >
-          Manage Drivers
-        </button>
+      <div style={{display: 'flex', gap: '10px', marginBottom: '25px'}}>
+        <button onClick={() => setActiveTab('bookings')} style={activeTab === 'bookings' ? activeTabStyle : inactiveTabStyle}>Trip Schedule</button>
+        <button onClick={() => setActiveTab('drivers')} style={activeTab === 'drivers' ? activeTabStyle : inactiveTabStyle}>Manage Drivers</button>
       </div>
 
       {activeTab === 'bookings' ? (
         <>
+          {/* LIVE MAP VIEW */}
+          {isLoaded ? (
+            <div style={mapWrapper}>
+              <h3 style={sectionTitle}>Fleet Distribution (Pickup Locations)</h3>
+              <GoogleMap
+                mapContainerStyle={{ width: '100%', height: '350px', borderRadius: '8px' }}
+                center={{ lat: 38.91, lng: -94.68 }}
+                zoom={10}
+                options={{ styles: darkMapTheme }}
+              >
+                {markers.map(marker => (
+                  <Marker 
+                    key={marker.id} 
+                    position={marker.pos} 
+                    onClick={() => setSelectedMarker(marker.details)} 
+                  />
+                ))}
+                {selectedMarker && (
+                  <InfoWindow 
+                    position={markers.find(m => m.id === selectedMarker.id).pos} 
+                    onCloseClick={() => setSelectedMarker(null)}
+                  >
+                    <div style={{color: '#000', fontSize: '12px'}}>
+                      <strong>{selectedMarker.name}</strong><br/>
+                      {selectedMarker.pickup}
+                    </div>
+                  </InfoWindow>
+                )}
+              </GoogleMap>
+            </div>
+          ) : <div style={mapWrapper}>Loading Map Assets...</div>}
+
           {/* REVENUE CHART */}
-          <div style={{background: '#fff', padding: '15px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', marginBottom: '25px'}}>
-            <h3 style={{marginTop: 0, fontSize: '1rem'}}>7-Day Revenue Trend</h3>
+          <div style={chartContainer}>
+            <h3 style={sectionTitle}>Revenue Performance (Last 7 Days)</h3>
             <div style={{height: '250px', width: '100%'}}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={getChartData()}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="day" hide={window.innerWidth < 500} />
-                  <YAxis />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="revenue" stroke="#C5A059" strokeWidth={3} dot={{ r: 5, fill: '#C5A059' }} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
+                  <XAxis dataKey="day" stroke="#999" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#999" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `$${val}`} />
+                  <Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}} />
+                  <Line type="monotone" dataKey="revenue" stroke="#C5A059" strokeWidth={4} dot={{ r: 6, fill: '#C5A059', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 8 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -150,42 +219,44 @@ const Admin = () => {
 
           <input 
             type="text" 
-            placeholder="Search trips, pickups, or drivers..." 
+            placeholder="Search by client name, pickup, or driver email..." 
             value={searchTerm} 
             onChange={(e) => setSearchTerm(e.target.value)} 
             style={searchBoxStyle} 
           />
 
           {/* BOOKINGS TABLE */}
-          <div style={tableContainerStyle}>
-            <table style={{width: '100%', borderCollapse: 'collapse', minWidth: '700px'}}>
+          <div style={tableWrapper}>
+            <table style={mainTable}>
               <thead>
-                <tr style={{background: '#111', color: '#C5A059', textAlign: 'left'}}>
-                  <th style={thStyle}>Date & Client</th>
+                <tr style={tableHeader}>
+                  <th style={thStyle}>Client / Date</th>
                   <th style={thStyle}>Route</th>
-                  <th style={thStyle}>Status</th>
+                  <th style={thStyle}>Dispatch Status</th>
                   <th style={thStyle}>Fare</th>
-                  <th style={thStyle}>Actions</th>
+                  <th style={thStyle}>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredBookings.map((job) => (
-                  <tr key={job.id} style={{borderBottom: '1px solid #eee'}}>
+                  <tr key={job.id} style={tableRow}>
                     <td style={tdStyle}>
-                      <strong>{job.date}</strong><br/>
-                      <span style={{fontSize: '0.85rem', color: '#666'}}>{job.name}</span>
+                      <div style={{fontWeight: 'bold'}}>{job.name}</div>
+                      <div style={{fontSize: '0.8rem', color: '#888'}}>{job.date}</div>
                     </td>
                     <td style={tdStyle}>
-                      <span style={{fontSize: '0.85rem'}}>{job.pickup.substring(0, 30)}...</span>
+                      <div style={{fontSize: '0.85rem', maxWidth: '250px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
+                        {job.pickup}
+                      </div>
                     </td>
                     <td style={tdStyle}>
-                      <span style={{color: job.driver ? '#28a745' : '#dc3545', fontWeight: 'bold', fontSize: '0.8rem'}}>
-                        {job.driver ? 'ASSIGNED' : 'PENDING'}
+                      <span style={statusBadge(job.driver)}>
+                        {job.driver ? `Assigned: ${job.driver.split('@')[0]}` : 'Unclaimed'}
                       </span>
                     </td>
-                    <td style={tdStyle}>${(job.amount / 100).toFixed(2)}</td>
+                    <td style={tdStyle}><strong>${(job.amount / 100).toFixed(2)}</strong></td>
                     <td style={tdStyle}>
-                      <button onClick={() => deleteBooking(job.id)} style={redBtnStyle}>Delete</button>
+                      <button onClick={() => deleteBooking(job.id)} style={redBtnStyle}>Remove</button>
                     </td>
                   </tr>
                 ))}
@@ -195,30 +266,29 @@ const Admin = () => {
         </>
       ) : (
         /* DRIVERS MANAGEMENT */
-        <div style={tableContainerStyle}>
-          <table style={{width: '100%', borderCollapse: 'collapse', minWidth: '500px'}}>
+        <div style={tableWrapper}>
+          <table style={mainTable}>
             <thead>
-              <tr style={{background: '#111', color: '#C5A059', textAlign: 'left'}}>
-                <th style={thStyle}>Name</th>
+              <tr style={tableHeader}>
+                <th style={thStyle}>Chauffeur Name</th>
                 <th style={thStyle}>Email</th>
-                <th style={thStyle}>Status</th>
+                <th style={thStyle}>Auth Status</th>
                 <th style={thStyle}>Action</th>
               </tr>
             </thead>
             <tbody>
               {users.filter(u => u.role === 'driver').map(driver => (
-                <tr key={driver.email} style={{borderBottom: '1px solid #eee'}}>
+                <tr key={driver.email} style={tableRow}>
                   <td style={tdStyle}>{driver.name}</td>
                   <td style={tdStyle}>{driver.email}</td>
                   <td style={tdStyle}>
-                    {driver.isApproved ? 
-                      <b style={{color:'green', fontSize: '0.8rem'}}>APPROVED</b> : 
-                      <b style={{color:'orange', fontSize: '0.8rem'}}>PENDING</b>
-                    }
+                    <span style={driverBadge(driver.isApproved)}>
+                      {driver.isApproved ? 'VERIFIED' : 'PENDING REVIEW'}
+                    </span>
                   </td>
                   <td style={tdStyle}>
                     {!driver.isApproved && (
-                      <button onClick={() => approveDriver(driver.email)} style={approveBtnStyle}>APPROVE</button>
+                      <button onClick={() => approveDriver(driver.email)} style={approveBtnStyle}>ACTIVATE</button>
                     )}
                   </td>
                 </tr>
@@ -232,13 +302,32 @@ const Admin = () => {
 };
 
 // --- STYLES ---
-const thStyle = { padding: '15px', fontSize: '0.9rem' };
-const tdStyle = { padding: '15px', fontSize: '0.9rem' };
-const tableContainerStyle = { overflowX: 'auto', WebkitOverflowScrolling: 'touch', background: '#fff', borderRadius: '8px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' };
-const searchBoxStyle = { width: '100%', padding: '15px', marginBottom: '20px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '16px', boxSizing: 'border-box' };
-const activeTabStyle = { background: '#C5A059', color: '#000', padding: '12px 20px', border: 'none', fontWeight: 'bold', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9rem' };
-const inactiveTabStyle = { background: '#ddd', color: '#666', padding: '12px 20px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9rem' };
-const redBtnStyle = { background: '#dc3545', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' };
-const approveBtnStyle = { background: '#C5A059', color: '#000', border: 'none', padding: '8px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' };
+const darkMapTheme = [{"elementType":"geometry","stylers":[{"color":"#212121"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#757575"}]},{"featureType":"road","elementType":"geometry","stylers":[{"color":"#484848"}]}];
+const sectionTitle = { marginTop: 0, fontSize: '1rem', color: '#333', marginBottom: '15px' };
+const mapWrapper = { background: '#fff', padding: '20px', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', marginBottom: '30px' };
+const loginOverlay = { minHeight: '90vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#000', padding: '20px' };
+const loginCard = { display: 'flex', flexDirection: 'column', gap: '15px', width: '100%', maxWidth: '350px', background: '#0f0f0f', padding: '40px', borderRadius: '12px', border: '1px solid #1a1a1a' };
+const loginInput = { padding: '15px', background: '#000', color: '#fff', border: '1px solid #333', fontSize: '16px', borderRadius: '4px' };
+const loginBtn = { padding: '15px', background: '#C5A059', fontWeight: 'bold', border: 'none', cursor: 'pointer', borderRadius: '4px' };
+const headerNav = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', flexWrap: 'wrap', gap: '20px' };
+const logoutBtn = { background: '#eee', color: '#333', padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' };
+const statsGrid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '30px' };
+const statCard = { background: '#fff', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', border: '1px solid #eee' };
+const statLabel = { fontSize: '0.75rem', color: '#888', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' };
+const statValue = { fontSize: '1.8rem', color: '#000', margin: '5px 0 0', fontWeight: '800' };
+const chartContainer = { background: '#fff', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', marginBottom: '30px' };
+const searchBoxStyle = { width: '100%', padding: '18px', marginBottom: '25px', borderRadius: '10px', border: '1px solid #ddd', fontSize: '16px', boxSizing: 'border-box' };
+const tableWrapper = { overflowX: 'auto', background: '#fff', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #eee' };
+const mainTable = { width: '100%', borderCollapse: 'collapse', minWidth: '800px' };
+const tableHeader = { background: '#fcfcfc', borderBottom: '2px solid #eee', textAlign: 'left' };
+const tableRow = { borderBottom: '1px solid #f0f0f0' };
+const thStyle = { padding: '18px', fontSize: '0.8rem', color: '#999', textTransform: 'uppercase', letterSpacing: '1px' };
+const tdStyle = { padding: '18px', fontSize: '0.95rem' };
+const activeTabStyle = { background: '#000', color: '#fff', padding: '12px 25px', border: 'none', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer' };
+const inactiveTabStyle = { background: '#fff', color: '#666', padding: '12px 25px', border: '1px solid #eee', borderRadius: '8px', cursor: 'pointer' };
+const redBtnStyle = { background: 'transparent', color: '#dc3545', border: '1px solid #dc3545', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' };
+const approveBtnStyle = { background: '#C5A059', color: '#000', border: 'none', padding: '8px 15px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' };
+const statusBadge = (driver) => ({ background: driver ? '#eefdf3' : '#fff1f0', color: driver ? '#28a745' : '#cf1322', padding: '6px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' });
+const driverBadge = (isApproved) => ({ background: isApproved ? '#e6f4ea' : '#fff4e5', color: isApproved ? '#1e7e34' : '#b7791f', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' });
 
 export default Admin;

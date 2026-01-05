@@ -7,26 +7,38 @@ const fs = require('fs');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { Client } = require("@googlemaps/google-maps-services-js"); // Added for Mapping
 require('dotenv').config();
 
-// Debug logs to verify your .env is working
-console.log("✅ Admin Password Loaded:", process.env.ADMIN_SECRET_PASSWORD ? "YES" : "NO");
-console.log("✅ Square Token Loaded:", process.env.SQUARE_ACCESS_TOKEN ? "YES" : "NO");
+// 1. DYNAMIC IP CONFIGURATION
+const LOCAL_IP = '192.168.1.4'; 
+const PORT = process.env.PORT || 5000;
+const BASE_URL = `http://${LOCAL_IP}:${PORT}`; 
+
+console.log(`🚀 CONFIG: Server targeting ${BASE_URL}`);
+
+// Initialize Google Maps Client
+const googleMapsClient = new Client({});
 
 const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_TOKEN);
 const app = express();
-const PORT = process.env.PORT || 5000;
+
 const DB_FILE = path.join(__dirname, 'bookings.json');
 const USERS_FILE = path.join(__dirname, 'users.json');
 const SECRET_KEY = process.env.JWT_SECRET || 'joco-executive-transportation-secret';
-const BASE_URL = 'http://localhost:5000'; 
 
-app.use(cors());
+// 2. UPDATED CORS FOR MULTI-DEVICE TESTING
+app.use(cors({
+  origin: '*', 
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 
 const squareClient = new SquareClient({
   token: process.env.SQUARE_ACCESS_TOKEN, 
-  environment: SquareEnvironment.Sandbox, // Change to .Production for real money
+  environment: SquareEnvironment.Sandbox, 
 });
 
 const transporter = nodemailer.createTransport({
@@ -88,19 +100,46 @@ app.post('/api/auth/login', async (req, res) => {
   res.json({ token, user: { name: user.name, role: user.role, email: user.email, isApproved: user.isApproved } });
 });
 
-// --- DISPATCH & PAYMENT ---
+// --- DISPATCH & PAYMENT (WITH INTEGRATED GEOCODING) ---
 app.post('/api/process-payment', async (req, res) => {
   const { sourceId, amount, bookingDetails } = req.body;
+  
   try {
+    // A. Geocode the address to get Coordinates for the Admin Map
+    let coords = { lat: 38.91, lng: -94.68 }; // Default: Overland Park
+    try {
+      const geoRes = await googleMapsClient.geocode({
+        params: {
+          address: bookingDetails.pickup,
+          key: process.env.REACT_APP_GOOGLE_MAPS_KEY 
+        }
+      });
+      if (geoRes.data.results.length > 0) {
+        coords = geoRes.data.results[0].geometry.location;
+      }
+    } catch (geoErr) {
+      console.error("📍 Geocoding error (using fallback):", geoErr.message);
+    }
+
+    // B. Process Square Payment
     const response = await squareClient.payments.create({
       sourceId, 
       idempotencyKey: Date.now().toString(),
       amountMoney: { amount: BigInt(amount), currency: 'USD' }
     });
 
-    const newBooking = { id: response.payment.id, ...bookingDetails, amount, driver: null, bookedAt: new Date() };
+    // C. Save Booking with Coords
+    const newBooking = { 
+        id: response.payment.id, 
+        ...bookingDetails, 
+        coords, // Added for Mapping
+        amount, 
+        driver: null, 
+        bookedAt: new Date() 
+    };
     saveBooking(newBooking);
     
+    // D. Dispatch Alerts
     const approvedDrivers = getUsers().filter(u => u.role === 'driver' && u.isApproved === true);
     approvedDrivers.forEach(async (driver) => {
       const claimLink = `${BASE_URL}/api/claim-job?id=${newBooking.id}&driver=${driver.email}`;
@@ -109,7 +148,7 @@ app.post('/api/process-payment', async (req, res) => {
         from: `"JOCO EXEC" <${process.env.EMAIL_USER}>`, 
         to: driver.email,
         subject: `NEW JOB: ${newBooking.date}`,
-        html: `<p>Route: ${newBooking.pickup} -> ${newBooking.dropoff}</p><a href="${claimLink}" style="padding:10px; background:gold; color:black; text-decoration:none;">ACCEPT JOB</a>`
+        html: `<p>Route: ${newBooking.pickup} -> ${newBooking.dropoff}</p><a href="${claimLink}" style="padding:15px; background:#C5A059; color:black; text-decoration:none; font-weight:bold; border-radius:4px;">ACCEPT JOB</a>`
       });
 
       if (process.env.TWILIO_PHONE) {
@@ -140,7 +179,7 @@ app.get('/api/claim-job', (req, res) => {
   const { id, driver } = req.query;
   const bookings = getBookings();
   const job = bookings.find(b => b.id === id);
-  if (!job || job.driver) return res.send("Job unavailable or already claimed.");
+  if (!job || job.driver) return res.send("<h1>Sorry!</h1><p>Job unavailable or already claimed.</p>");
   job.driver = driver;
   updateBooking(job);
   res.send(`<h1>Job Claimed!</h1><p>It is now in your portal.</p><a href="${createGoogleCalLink(job)}">Add to Calendar</a>`);
@@ -178,4 +217,9 @@ app.delete('/api/admin/bookings/:id', (req, res) => {
 app.use(express.static(path.join(__dirname, 'build')));
 app.get('/*path', (req, res) => { res.sendFile(path.join(__dirname, 'build', 'index.html')); });
 
-app.listen(PORT, () => console.log(`🚀 JOCO EXEC running on port ${PORT}`));
+// BIND TO 0.0.0.0 TO ALLOW EXTERNAL CONNECTIONS (IPHONE)
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 JOCO EXEC running on port ${PORT}`);
+  console.log(`🔗 Local:   http://localhost:${PORT}`);
+  console.log(`🔗 Network: http://${LOCAL_IP}:${PORT}`);
+});
