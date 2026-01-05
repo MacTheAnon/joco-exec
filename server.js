@@ -1,4 +1,4 @@
-const { SquareClient, SquareEnvironment } = require('square'); // NEW naming convention
+const { SquareClient, SquareEnvironment } = require('square'); 
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -14,16 +14,16 @@ const DB_FILE = path.join(__dirname, 'bookings.json');
 const USERS_FILE = path.join(__dirname, 'users.json');
 const SECRET_KEY = process.env.JWT_SECRET || 'joco-executive-transportation-secret';
 
-// CHANGE THIS when you go live (e.g., 'https://www.jocoexec.com')
 const BASE_URL = 'http://localhost:5000'; 
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 
 // --- 1. SETUP SQUARE & EMAIL ---
 const squareClient = new SquareClient({
-  token: process.env.SQUARE_ACCESS_TOKEN, // Note: changed from 'accessToken' to 'token'
-  environment: SquareEnvironment.Sandbox, // Note: changed from 'Environment' to 'SquareEnvironment'
+  token: process.env.SQUARE_ACCESS_TOKEN, 
+  environment: SquareEnvironment.Sandbox, 
 });
 
 const transporter = nodemailer.createTransport({
@@ -104,7 +104,6 @@ app.get('/api/claim-job', (req, res) => {
 app.post('/api/process-payment', async (req, res) => {
   const { sourceId, amount, bookingDetails } = req.body;
   try {
-    // Note: 'paymentsApi' changed to 'payments' in latest SDK
     const response = await squareClient.payments.create({
       sourceId, 
       idempotencyKey: Date.now().toString(),
@@ -135,20 +134,11 @@ app.get('/api/admin/bookings', (req, res) => {
   res.json(getBookings());
 });
 
-// --- 6. SERVE FRONTEND ---
-
-// First, handle all static files (CSS, JS, Images)
+// --- 6. SERVE FRONTEND (Express 5.0 Fix) ---
 app.use(express.static(path.join(__dirname, 'build')));
 
-// Second, the "Catch-All" middleware.
-// This handles any request that didn't match an API route or a physical file.
-// It bypasses the Express 5.0 path-to-regexp error entirely.
-app.use((req, res, next) => {
-  // If the request is for an API but wasn't found, don't send index.html
-  if (req.path.startsWith('/api')) {
-    return res.status(404).json({ error: 'API route not found' });
-  }
-  // Otherwise, send the React app
+// Named wildcard required for Express 5.0
+app.get('/*', (req, res) => {
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
