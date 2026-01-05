@@ -110,10 +110,14 @@ app.post('/api/process-payment', async (req, res) => {
   
   try {
     // 1. Process payment through Square
+    // FIX: Latest Square SDK requires amount to be a BigInt
     const response = await squareClient.payments.create({
       sourceId, 
       idempotencyKey: Date.now().toString(),
-      amountMoney: { amount, currency: 'USD' }
+      amountMoney: { 
+        amount: BigInt(amount), 
+        currency: 'USD' 
+      }
     });
 
     // 2. Save booking after payment
@@ -142,7 +146,7 @@ app.post('/api/process-payment', async (req, res) => {
                <a href="${claimLink}" style="padding:10px; background:gold; color:black; text-decoration:none;">ACCEPT JOB</a>`
       });
 
-      // Twilio SMS Dispatch (only if it's a phone number and not an email)
+      // Twilio SMS Dispatch
       if (!driverTarget.includes('@') && process.env.TWILIO_PHONE) {
         try {
           await twilioClient.messages.create({
