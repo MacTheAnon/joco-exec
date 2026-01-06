@@ -10,7 +10,8 @@ const BookingForm = ({ onSubmit }) => {
     pickup: '',
     dropoff: '',
     meetAndGreet: false,
-    passengers: '1'
+    passengers: '1',
+    serviceType: 'Sedan' // Default to Sedan ($85)
   });
   const [checking, setChecking] = useState(false);
 
@@ -29,17 +30,23 @@ const BookingForm = ({ onSubmit }) => {
     setChecking(true);
 
     try {
-      // --- DYNAMIC PRICING LOGIC ---
-      let baseDeposit = 15000; // Standard $150.00
-      const bookingDate = new Date(formData.date);
-      
-      // World Cup Pricing: June 2026
-      if (bookingDate.getFullYear() === 2026 && bookingDate.getMonth() === 5) {
-        baseDeposit = 25000; // $250.00
+      // --- PRICING LOGIC ---
+      let calculatedAmount = 8500; // Default Sedan ($85.00)
+
+      if (formData.serviceType === 'SUV') {
+        calculatedAmount = 9500; // SUV ($95.00)
+      } else if (formData.serviceType === 'NightOut') {
+        calculatedAmount = 15000; // Night Out ($150.00)
       }
 
-      // IP Check
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://192.168.1.173:5000';
+      // WORLD CUP OVERRIDE (June 2026)
+      const bookingDate = new Date(formData.date);
+      if (bookingDate.getFullYear() === 2026 && bookingDate.getMonth() === 5) {
+        calculatedAmount = 25000; // World Cup Fixed Price ($250.00)
+      }
+
+      // --- CHECK AVAILABILITY ---
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://192.168.1.12:5000';
       
       const response = await fetch(`${apiUrl}/api/check-availability`, {
         method: 'POST',
@@ -50,7 +57,8 @@ const BookingForm = ({ onSubmit }) => {
       const data = await response.json();
 
       if (data.available) {
-        onSubmit({ ...formData, amount: baseDeposit }); 
+        // Submit with the correct calculated amount
+        onSubmit({ ...formData, amount: calculatedAmount }); 
       } else {
         alert("❌ Sorry, that time slot is already booked. Please choose another time.");
       }
@@ -80,6 +88,14 @@ const BookingForm = ({ onSubmit }) => {
            </div>
         </div>
 
+        {/* --- SERVICE SELECTION DROPDOWN --- */}
+        <label style={labelStyle}>Select Service</label>
+        <select name="serviceType" style={mobileInputStyle} onChange={handleChange} value={formData.serviceType}>
+            <option value="Sedan">Luxury Sedan ($85.00)</option>
+            <option value="SUV">Executive SUV ($95.00)</option>
+            <option value="NightOut">Night Out / Hourly ($150.00)</option>
+        </select>
+
         <div style={responsiveGrid}>
           <div style={{flex: 1}}>
             <label style={labelStyle}>Date</label>
@@ -97,7 +113,7 @@ const BookingForm = ({ onSubmit }) => {
         <label style={labelStyle}>Dropoff Location</label>
         <input type="text" name="dropoff" style={mobileInputStyle} onChange={handleChange} placeholder="Destination Address" required />
 
-        {/* --- NEW: MEET & GREET OPTION --- */}
+        {/* --- MEET & GREET OPTION --- */}
         <div style={{ marginBottom: '20px', padding: '15px', background: '#000', borderRadius: '6px', border: '1px solid #333' }}>
           <label style={{ color: '#C5A059', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem' }}>
             <input 
@@ -116,7 +132,6 @@ const BookingForm = ({ onSubmit }) => {
         </button>
       </form>
       
-      {/* --- UPDATED BADGE TEXT --- */}
       <div style={{ marginTop: '30px', borderTop: '1px solid #222', paddingTop: '20px', textAlign: 'center' }}>
          <h4 style={{ color: '#C5A059', margin: '0 0 5px 0', textTransform: 'uppercase', letterSpacing: '1px' }}>Executive Reliability</h4>
          <p style={{ fontSize: '0.9rem', color: '#888', margin: 0, lineHeight: '1.4' }}>
@@ -127,12 +142,61 @@ const BookingForm = ({ onSubmit }) => {
   );
 };
 
-// Styles (Preserved)
+// --- STYLES ---
 const isMobile = window.innerWidth < 600;
-const formCardStyle = { background: '#111', border: '1px solid #C5A059', padding: isMobile ? '20px' : '35px', borderRadius: '12px', maxWidth: '500px', margin: '0 auto', color: '#fff', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' };
-const labelStyle = { display: 'block', marginBottom: '8px', color: '#C5A059', fontWeight: 'bold', fontSize: '0.9rem', letterSpacing: '0.5px' };
-const mobileInputStyle = { width: '100%', padding: '14px', marginBottom: '20px', background: '#000', border: '1px solid #333', color: '#fff', borderRadius: '6px', boxSizing: 'border-box', fontSize: '16px', fontFamily: 'inherit' };
-const responsiveGrid = { display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '0px' : '15px' };
-const mobileButtonStyle = { width: '100%', padding: '18px', background: '#C5A059', color: '#000', border: 'none', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', marginTop: '10px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '1px' };
+
+const formCardStyle = {
+  background: '#111', 
+  border: '1px solid #C5A059', 
+  padding: isMobile ? '20px' : '35px', 
+  borderRadius: '12px', 
+  maxWidth: '500px', 
+  margin: '0 auto', 
+  color: '#fff',
+  boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+};
+
+const labelStyle = { 
+  display: 'block', 
+  marginBottom: '8px', 
+  color: '#C5A059', 
+  fontWeight: 'bold', 
+  fontSize: '0.9rem',
+  letterSpacing: '0.5px'
+};
+
+const mobileInputStyle = { 
+  width: '100%', 
+  padding: '14px', 
+  marginBottom: '20px', 
+  background: '#000', 
+  border: '1px solid #333', 
+  color: '#fff', 
+  borderRadius: '6px', 
+  boxSizing: 'border-box',
+  fontSize: '16px', 
+  fontFamily: 'inherit'
+};
+
+const responsiveGrid = {
+  display: 'flex', 
+  flexDirection: isMobile ? 'column' : 'row', 
+  gap: isMobile ? '0px' : '15px' 
+};
+
+const mobileButtonStyle = { 
+  width: '100%', 
+  padding: '18px', 
+  background: '#C5A059', 
+  color: '#000', 
+  border: 'none', 
+  fontWeight: 'bold', 
+  fontSize: '1rem', 
+  cursor: 'pointer', 
+  marginTop: '10px',
+  borderRadius: '6px',
+  textTransform: 'uppercase',
+  letterSpacing: '1px'
+};
 
 export default BookingForm;

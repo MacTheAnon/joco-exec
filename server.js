@@ -9,8 +9,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
-// 1. DYNAMIC IP CONFIGURATION
-const LOCAL_IP = '192.168.1.173'; 
+// 1. UPDATED IP ADDRESS
+const LOCAL_IP = '192.168.1.12'; 
 const PORT = process.env.PORT || 5000;
 const BASE_URL = `http://${LOCAL_IP}:${PORT}`; 
 
@@ -54,10 +54,6 @@ const getBookings = () => {
   return JSON.parse(fs.readFileSync(DB_FILE, 'utf8') || '[]');
 };
 const saveBooking = (b) => fs.writeFileSync(DB_FILE, JSON.stringify([...getBookings(), b], null, 2));
-const updateBooking = (updated) => {
-  const bb = getBookings().map(b => b.id === updated.id ? updated : b);
-  fs.writeFileSync(DB_FILE, JSON.stringify(bb, null, 2));
-};
 const getUsers = () => {
   if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, '[]');
   return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8') || '[]');
@@ -71,7 +67,7 @@ app.post('/api/check-availability', (req, res) => {
     const { date, time } = req.body;
     const bookings = getBookings();
     const isTaken = bookings.some(b => b.date === date && b.time === time);
-    console.log(`🔍 Checking availability for ${date} @ ${time}: ${isTaken ? 'TAKEN' : 'AVAILABLE'}`);
+    console.log(`🔍 Check: ${date} @ ${time} is ${isTaken ? 'TAKEN' : 'AVAILABLE'}`);
     res.json({ available: !isTaken });
   } catch (err) {
     console.error("Availability Error:", err);
@@ -79,18 +75,20 @@ app.post('/api/check-availability', (req, res) => {
   }
 });
 
+// --- UPDATED LOGIN (USERNAME OR EMAIL) ---
 app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body;
+  const { identifier, password } = req.body; // 'identifier' can be email OR username
   
-  // *** MASTER ADMIN BYPASS (FIXES YOUR LOGIN ISSUE) ***
-  if (email === 'kalebm.lord@gmail.com' && password === 'JoC03x3c2026') {
+  // MASTER ADMIN BYPASS (Login with Email OR Username "admin")
+  if ((identifier === 'kalebm.lord@gmail.com' || identifier === 'admin') && password === 'JoC03x3c2026') {
       console.log("👑 MASTER ADMIN LOGGED IN");
-      const token = jwt.sign({ id: 'master-admin', email, role: 'admin' }, SECRET_KEY, { expiresIn: '1d' });
-      return res.json({ token, user: { name: 'Admin', role: 'admin', email, isApproved: true } });
+      const token = jwt.sign({ id: 'master-admin', email: 'admin', role: 'admin' }, SECRET_KEY, { expiresIn: '1d' });
+      return res.json({ token, user: { name: 'Master Admin', role: 'admin', email: 'admin@internal', isApproved: true } });
   }
 
-  // Normal User Check
-  const user = getUsers().find(u => u.email === email);
+  // Normal User Check (Check Email OR Username)
+  const user = getUsers().find(u => u.email === identifier || u.username === identifier);
+  
   if (!user || !(await bcrypt.compare(password, user.password))) {
     return res.status(400).json({ error: "Invalid credentials" });
   }
@@ -99,75 +97,78 @@ app.post('/api/auth/login', async (req, res) => {
   res.json({ token, user: { name: user.name, role: user.role, email: user.email, isApproved: user.isApproved } });
 });
 
+// --- UPDATED REGISTER (INCLUDES USERNAME) ---
+app.post('/api/auth/register', async (req, res) => {
+  const { name, username, email, password, role } = req.body;
+  
+  if (role === 'admin') return res.status(403).json({ error: "Restricted role." });
+
+  const users = getUsers();
+  // Check if Email OR Username already exists
+  if (users.find(u => u.email === email || u.username === username)) {
+      return res.status(400).json({ error: "Email or Username already taken." });
+  }
+  
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const newUser = { 
+    id: Date.now().toString(), 
+    name, 
+    username, // Save username
+    email, 
+    password: hashedPassword, 
+    role: role || 'customer',
+    isApproved: role === 'driver' ? false : true 
+  };
+  
+  saveUser(newUser);
+  const token = jwt.sign({ id: newUser.id, email: newUser.email, role: newUser.role }, SECRET_KEY, { expiresIn: '1d' });
+  res.json({ success: true, token, user: { name: newUser.name, role: newUser.role, email: newUser.email, isApproved: newUser.isApproved } });
+});
+
 // --- PAYMENT & DISPATCH ---
 app.post('/api/process-payment', async (req, res) => {
   const { sourceId, amount, bookingDetails } = req.body;
-  
   try {
-    // 1. Calculate Final Amount (Server-Side)
     let finalAmount = BigInt(amount);
-    
-    // Add $25.00 for Meet & Greet
-    if (bookingDetails.meetAndGreet) {
-      finalAmount += BigInt(2500); 
-    }
+    if (bookingDetails.meetAndGreet) finalAmount += BigInt(2500); 
 
-    // 2. Process Square Payment
     const response = await squareClient.paymentsApi.createPayment({
       sourceId, 
       idempotencyKey: Date.now().toString(),
       amountMoney: { amount: finalAmount, currency: 'USD' }
     });
 
-    // 3. Save Booking
     const newBooking = { 
         id: response.result.payment.id, 
         ...bookingDetails, 
-        totalCharged: Number(finalAmount), // Convert BigInt to Number for JSON
+        totalCharged: Number(finalAmount), 
         status: 'PAID',
-        driver: null, 
         bookedAt: new Date() 
     };
     saveBooking(newBooking);
     
-    // 4. Dispatch Alerts
+    // Dispatch (Simple)
     const approvedDrivers = getUsers().filter(u => u.role === 'driver' && u.isApproved === true);
     approvedDrivers.forEach(async (driver) => {
-      const claimLink = `${BASE_URL}/api/claim-job?id=${newBooking.id}&driver=${driver.email}`;
-      
       transporter.sendMail({
         from: `"JOCO EXEC" <${process.env.EMAIL_USER}>`, 
         to: driver.email,
         subject: `NEW JOB: ${newBooking.date}`,
-        html: `<p>Route: ${newBooking.pickup} -> ${newBooking.dropoff}</p><p>Meet & Greet: ${bookingDetails.meetAndGreet ? 'YES' : 'NO'}</p><a href="${claimLink}">ACCEPT JOB</a>`
+        html: `<p>New Job Available. Log in to claim.</p>`
       });
     });
 
-    // 5. Send Success (AVOIDING BIGINT CRASH)
     res.json({ success: true, paymentId: response.result.payment.id });
 
   } catch (e) { 
-    console.error("Payment Error:", e);
-    // Handle BigInt serialization error if it occurs in logging
     res.status(500).json({ error: e.message || "Payment Processing Failed" }); 
   }
 });
 
-// --- ADMIN ROUTES ---
-app.get('/api/admin/bookings', (req, res) => {
-  // Simple check for token or secret password
-  if (req.headers['authorization'] && req.headers['authorization'].includes('Bearer')) {
-     // Assume valid if they have a token (simplified for your testing)
-     return res.json(getBookings());
-  }
-  // Fallback for direct password access
-  if (req.headers['authorization'] !== process.env.ADMIN_SECRET_PASSWORD) return res.status(401).send();
-  res.json(getBookings());
-});
-
+app.get('/api/admin/bookings', (req, res) => res.json(getBookings()));
 app.get('/api/admin/users', (req, res) => res.json(getUsers()));
 
-// --- SERVE FRONTEND ---
+// SERVE FRONTEND
 app.use(express.static(path.join(__dirname, 'build')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'build', 'index.html')));
 

@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-ro
 
 // Import Pages
 import Home from './pages/Home';
-import Booking from './pages/Booking';
+import Booking from './pages/Booking'; // Ensure this file exists now!
 import Login from './pages/Login';
 import Register from './pages/Register'; 
 import Dashboard from './pages/Dashboard';
@@ -18,7 +18,7 @@ import Footer from './components/Footer';
 
 function App() {
   const [user, setUser] = useState(null);
-  const [isMenuOpen, setIsMenuOpen] = useState(false); // NEW: Track mobile menu state
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -33,14 +33,13 @@ function App() {
     window.location.href = '/'; 
   };
 
-  // Helper to close menu when a link is clicked
   const closeMenu = () => setIsMenuOpen(false);
 
   return (
     <Router>
       <div className="App" style={{display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#000'}}>
         
-        {/* --- MOBILE-READY NAVIGATION --- */}
+        {/* --- NAVIGATION --- */}
         <nav style={{
           background: '#000', 
           padding: '15px 25px', 
@@ -58,7 +57,7 @@ function App() {
             </div>
           </Link>
 
-          {/* Hamburger Icon for Mobile */}
+          {/* Hamburger Icon */}
           <button 
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             style={{
@@ -73,7 +72,7 @@ function App() {
             {isMenuOpen ? '✕' : '☰'}
           </button>
           
-          {/* Navigation Links Container */}
+          {/* Navigation Links */}
           <div style={{
             display: (isMenuOpen || window.innerWidth > 768) ? 'flex' : 'none',
             flexDirection: window.innerWidth < 768 ? 'column' : 'row',
@@ -91,23 +90,10 @@ function App() {
             
             {user ? (
               <>
-                {user.role === 'driver' && (
-                  <Link to="/driver-dashboard" style={goldLinkStyle} onClick={closeMenu}>Driver Portal</Link>
-                )}
-                {user.role === 'admin' && (
-                  <Link to="/admin" style={goldLinkStyle} onClick={closeMenu}>Admin Panel</Link>
-                )}
-                {user.role === 'customer' && (
-                  <Link to="/dashboard" style={goldLinkStyle} onClick={closeMenu}>My Trips</Link>
-                )}
-                
-                <span style={{color: '#888', fontSize: '0.9rem'}}>
-                  Hello, {user.name.split(' ')[0]}
-                </span>
-                
-                <button onClick={handleLogout} style={logoutBtnStyle}>
-                  Logout
-                </button>
+                {user.role === 'driver' && <Link to="/driver-dashboard" style={goldLinkStyle} onClick={closeMenu}>Driver Portal</Link>}
+                {user.role === 'admin' && <Link to="/admin" style={goldLinkStyle} onClick={closeMenu}>Admin Panel</Link>}
+                {user.role === 'customer' && <Link to="/dashboard" style={goldLinkStyle} onClick={closeMenu}>My Trips</Link>}
+                <button onClick={handleLogout} style={logoutBtnStyle}>Logout</button>
               </>
             ) : (
               <>
@@ -120,30 +106,19 @@ function App() {
         </nav>
 
         {/* --- ROUTES --- */}
-        
         <div style={{flex: 1}}>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/booking" element={<Booking />} />
             <Route path="/login" element={<Login setUser={setUser} />} />
             <Route path="/register" element={<Register />} /> 
-
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/refunds" element={<Refunds />} />
 
-            <Route 
-              path="/admin" 
-              element={user && user.role === 'admin' ? <Admin /> : <Navigate to="/login" />} 
-            />
-            <Route 
-              path="/dashboard" 
-              element={user ? <Dashboard /> : <Navigate to="/login" />} 
-            />
-            <Route 
-              path="/driver-dashboard" 
-              element={user && user.role === 'driver' ? <DriverDashboard /> : <Navigate to="/login" />} 
-            />
+            <Route path="/admin" element={user && user.role === 'admin' ? <Admin /> : <Navigate to="/login" />} />
+            <Route path="/dashboard" element={user ? <Dashboard /> : <Navigate to="/login" />} />
+            <Route path="/driver-dashboard" element={user && user.role === 'driver' ? <DriverDashboard /> : <Navigate to="/login" />} />
           </Routes>
         </div>
 
@@ -153,10 +128,11 @@ function App() {
   );
 }
 
-// Styles for cleaner code
+// Styles
 const navLinkStyle = { color: '#fff', textDecoration: 'none', padding: '10px' };
 const goldLinkStyle = { ...navLinkStyle, color: '#C5A059', fontWeight: 'bold' };
 const logoutBtnStyle = { background: 'transparent', color: '#fff', border: '1px solid #444', padding: '5px 12px', cursor: 'pointer', borderRadius: '4px', marginLeft: '10px' };
 const bookBtnStyle = { background: '#C5A059', color: '#000', padding: '10px 20px', borderRadius: '4px', textDecoration: 'none', fontWeight: 'bold' };
 
 export default App;
+

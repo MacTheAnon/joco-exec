@@ -29,7 +29,7 @@ const SquarePayment = ({ onSuccess, bookingDetails }) => {
         cardTokenizeResponseReceived={async (token) => {
           setIsSubmitting(true);
           try {
-            const apiUrl = process.env.REACT_APP_API_URL || 'http://192.168.1.173:5000';
+            const apiUrl = process.env.REACT_APP_API_URL || 'http://192.168.1.12:5000';
             const response = await fetch(`${apiUrl}/api/process-payment`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
