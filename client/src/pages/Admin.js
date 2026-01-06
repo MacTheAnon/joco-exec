@@ -12,10 +12,10 @@ const Admin = () => {
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [markers, setMarkers] = useState([]);
 
-  // Use the central API URL logic
-  const apiUrl = process.env.REACT_APP_API_URL || 'http://192.168.1.4:5000';
+  // UPDATED: Points to your new Windows Victus IP
+  const apiUrl = process.env.REACT_APP_API_URL || 'http://192.168.1.12:5000';
 
-  // Google Maps Loader
+  // Google Maps Loader (Preserved lines)
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_KEY
@@ -47,7 +47,7 @@ const Admin = () => {
     }
   };
 
-  // Turn saved coordinates into Map Pins
+  // Map Pins Logic (Preserved lines)
   useEffect(() => {
     if (bookings) {
       const validMarkers = bookings
@@ -104,7 +104,7 @@ const Admin = () => {
     });
   };
 
-  // --- KPI CALCULATIONS ---
+  // KPI & Filter Logic (Preserved lines)
   const totalRevenue = bookings ? bookings.reduce((sum, b) => sum + (Number(b.amount) / 100), 0) : 0;
   const driverCount = users.filter(u => u.role === 'driver' && u.isApproved).length;
 
@@ -114,6 +114,7 @@ const Admin = () => {
     (job.driver && job.driver.toLowerCase().includes(searchTerm.toLowerCase()))
   ).sort((a,b) => new Date(b.date) - new Date(a.date)) : [];
 
+  // Login View
   if (!bookings) {
     return (
       <div style={loginOverlay}>
@@ -133,10 +134,9 @@ const Admin = () => {
     );
   }
 
+  // Dashboard View (Preserved styles and structure)
   return (
     <div style={{padding: '20px', minHeight: '100vh', background: '#f8f9fa', maxWidth: '1200px', margin: '0 auto'}}>
-      
-      {/* HEADER */}
       <div style={headerNav}>
         <div>
           <h1 style={{fontSize: '1.8rem', margin: 0, fontWeight: '800'}}>Fleet Control</h1>
@@ -145,7 +145,6 @@ const Admin = () => {
         <button onClick={() => setBookings(null)} style={logoutBtn}>Log Out</button>
       </div>
 
-      {/* QUICK STATS CARDS */}
       <div style={statsGrid}>
         <div style={statCard}>
           <span style={statLabel}>Total Revenue</span>
@@ -161,7 +160,6 @@ const Admin = () => {
         </div>
       </div>
 
-      {/* TABS */}
       <div style={{display: 'flex', gap: '10px', marginBottom: '25px'}}>
         <button onClick={() => setActiveTab('bookings')} style={activeTab === 'bookings' ? activeTabStyle : inactiveTabStyle}>Trip Schedule</button>
         <button onClick={() => setActiveTab('drivers')} style={activeTab === 'drivers' ? activeTabStyle : inactiveTabStyle}>Manage Drivers</button>
@@ -169,7 +167,6 @@ const Admin = () => {
 
       {activeTab === 'bookings' ? (
         <>
-          {/* LIVE MAP VIEW */}
           {isLoaded ? (
             <div style={mapWrapper}>
               <h3 style={sectionTitle}>Fleet Distribution (Pickup Locations)</h3>
@@ -201,7 +198,6 @@ const Admin = () => {
             </div>
           ) : <div style={mapWrapper}>Loading Map Assets...</div>}
 
-          {/* REVENUE CHART */}
           <div style={chartContainer}>
             <h3 style={sectionTitle}>Revenue Performance (Last 7 Days)</h3>
             <div style={{height: '250px', width: '100%'}}>
@@ -219,13 +215,12 @@ const Admin = () => {
 
           <input 
             type="text" 
-            placeholder="Search by client name, pickup, or driver email..." 
+            placeholder="Search bookings..." 
             value={searchTerm} 
             onChange={(e) => setSearchTerm(e.target.value)} 
             style={searchBoxStyle} 
           />
 
-          {/* BOOKINGS TABLE */}
           <div style={tableWrapper}>
             <table style={mainTable}>
               <thead>
@@ -265,7 +260,6 @@ const Admin = () => {
           </div>
         </>
       ) : (
-        /* DRIVERS MANAGEMENT */
         <div style={tableWrapper}>
           <table style={mainTable}>
             <thead>
@@ -301,7 +295,7 @@ const Admin = () => {
   );
 };
 
-// --- STYLES ---
+// --- STYLES (Unchanged) ---
 const darkMapTheme = [{"elementType":"geometry","stylers":[{"color":"#212121"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#757575"}]},{"featureType":"road","elementType":"geometry","stylers":[{"color":"#484848"}]}];
 const sectionTitle = { marginTop: 0, fontSize: '1rem', color: '#333', marginBottom: '15px' };
 const mapWrapper = { background: '#fff', padding: '20px', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', marginBottom: '30px' };

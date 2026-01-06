@@ -58,12 +58,13 @@ const SquarePayment = ({ onSuccess, bookingDetails }) => {
         cardTokenizeResponseReceived={async (token) => {
           setIsSubmitting(true);
           try {
-            const response = await fetch('http://localhost:5000/api/process-payment', {
+            // UPDATED: Points to your new Windows Victus IP
+            const response = await fetch('http://192.168.1.12:5000/api/process-payment', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 
                 sourceId: token.token,
-                amount: selectedAmount, // This is now correctly 7500, 9500, or 15000
+                amount: selectedAmount, 
                 bookingDetails: bookingDetails 
               }),
             });
