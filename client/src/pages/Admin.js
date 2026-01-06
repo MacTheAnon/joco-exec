@@ -12,9 +12,9 @@ const Admin = () => {
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [markers, setMarkers] = useState([]);
 
-  // UPDATED: Points to your new Windows Victus IP
-  const apiUrl = process.env.REACT_APP_API_URL || 'http://192.168.1.173:5000';
-
+  // UPDATED FOR WINDOWS VICTUS NETWORK ACCESS
+  const apiUrl = 'http://192.168.1.173:5000';
+  const ADMIN_SECRET = 'JoC03x3c2026';
   // Google Maps Loader (Preserved lines)
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
