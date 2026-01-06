@@ -8,7 +8,7 @@ const SquarePayment = ({ onSuccess, bookingDetails }) => {
 
   // 2. Ensure every value is UNIQUE
   const paymentOptions = [
-    { label: "Sedan - Trip Minimum ($75)", value: 7500 },
+    { label: "Sedan - Trip Minimum ($85)", value: 8500 },
     { label: "SUV - Trip Minimum ($95)", value: 9500 }, 
     { label: "Night Out - Minimum ($150)", value: 15000 },
   ];

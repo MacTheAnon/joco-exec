@@ -14,16 +14,16 @@ const CancellationPolicy = () => {
         
         {/* 1. THE 12-HOUR RULE */}
         <section style={sectionStyle}>
-          <h3 style={headerStyle}>1. The 12-Hour Window</h3>
-          <p style={proseStyle}>We require a minimum of 12 hours notice for all cancellations to manage our fleet effectively.</p>
+          <h3 style={headerStyle}>1. The 24-Hour Window</h3>
+          <p style={proseStyle}>We require a minimum of 24 hours notice for all cancellations to manage our fleet effectively.</p>
           
           <div style={timelineWrapper}>
             <div style={timelineBox}>
-              <span style={{ color: '#4caf50', fontWeight: 'bold' }}>12+ Hours</span>
+              <span style={{ color: '#4caf50', fontWeight: 'bold' }}>24+ Hours</span>
               <p style={{ margin: '5px 0 0', fontSize: '0.85rem' }}>Full Refund Issued</p>
             </div>
             <div style={{ ...timelineBox, borderLeft: '2px solid #333' }}>
-              <span style={{ color: '#ff4444', fontWeight: 'bold' }}>&lt; 12 Hours</span>
+              <span style={{ color: '#ff4444', fontWeight: 'bold' }}>&lt;Within 24 Hours</span>
               <p style={{ margin: '5px 0 0', fontSize: '0.85rem' }}>Non-Refundable</p>
             </div>
           </div>

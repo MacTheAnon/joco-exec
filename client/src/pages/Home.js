@@ -77,7 +77,7 @@ const Home = () => {
           <div className="price-card">
             <h3>Luxury Sedan</h3>
             <p style={{ color: '#888', fontSize: '0.85rem' }}>Lincoln Continental or Similar</p>
-            <div className="price-tag">$75</div>
+            <div className="price-tag">$85</div>
             <p style={{ color: '#C5A059', fontWeight: 'bold', fontSize: '0.85rem' }}>Minimum for All Trips</p>
             <ul className="price-features">
               <li><MapPin size={14} style={{ marginRight: '8px' }}/> Airport Transfers</li>

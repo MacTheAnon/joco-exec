@@ -10,7 +10,8 @@ const DriverDashboard = () => {
     const fetchJobs = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch('http://localhost:5000/api/user/my-bookings', {
+        // UPDATED: Points to your new Windows Victus IP
+        const res = await fetch('http://192.168.1.173:5000/api/user/my-bookings', {
           headers: { 'Authorization': token }
         });
         
@@ -80,7 +81,7 @@ const DriverDashboard = () => {
                 </div>
 
                 <a 
-                  href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.pickup)}`}
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.pickup)}`}
                   target="_blank" 
                   rel="noreferrer"
                   style={{
