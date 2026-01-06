@@ -23,7 +23,7 @@ const CancellationPolicy = () => {
               <p style={{ margin: '5px 0 0', fontSize: '0.85rem' }}>Full Refund Issued</p>
             </div>
             <div style={{ ...timelineBox, borderLeft: '2px solid #333' }}>
-              <span style={{ color: '#ff4444', fontWeight: 'bold' }}>&lt;Within 24 Hours</span>
+              <span style={{ color: '#ff4444', fontWeight: 'bold' }}>&lt;Less Than 24 Hours</span>
               <p style={{ margin: '5px 0 0', fontSize: '0.85rem' }}>Non-Refundable</p>
             </div>
           </div>
