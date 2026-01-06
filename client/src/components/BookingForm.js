@@ -2,12 +2,21 @@ import React, { useState } from 'react';
 
 const BookingForm = ({ onSubmit }) => {
   const [formData, setFormData] = useState({
-    date: '', time: '', pickup: '', dropoff: '', passengers: '1', name: '', email: '', phone: ''
+    date: '', 
+    time: '', 
+    pickup: '', 
+    dropoff: '', 
+    passengers: '1', 
+    name: '', 
+    email: '', 
+    phone: '',
+    meetAndGreet: false // New Feature added
   });
   const [checking, setChecking] = useState(false);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    setFormData({ ...formData, [e.target.name]: value });
   };
 
   const handleSubmit = async (e) => {
@@ -20,8 +29,17 @@ const BookingForm = ({ onSubmit }) => {
     setChecking(true);
 
     try {
+      // --- DYNAMIC PRICING LOGIC ---
+      let baseDeposit = 15000; // Standard $150.00
+      const bookingDate = new Date(formData.date);
+      
+      // World Cup Pricing: June 2026
+      if (bookingDate.getFullYear() === 2026 && bookingDate.getMonth() === 5) {
+        baseDeposit = 25000; // $250.00
+      }
+
       // UPDATED: Points to your new Windows Victus IP
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://192.168.1.12:5000';
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://192.168.1.173:5000';
       
       const response = await fetch(`${apiUrl}/api/check-availability`, {
         method: 'POST',
@@ -32,7 +50,8 @@ const BookingForm = ({ onSubmit }) => {
       const data = await response.json();
 
       if (data.available) {
-        onSubmit(formData); 
+        // Pass base amount (Server adds Meet & Greet fee)
+        onSubmit({ ...formData, amount: baseDeposit }); 
       } else {
         alert("❌ Sorry, that time slot is already booked. Please choose another time.");
       }
@@ -79,10 +98,32 @@ const BookingForm = ({ onSubmit }) => {
         <label style={labelStyle}>Dropoff Location</label>
         <input type="text" name="dropoff" style={mobileInputStyle} onChange={handleChange} placeholder="Destination Address" required />
 
+        {/* --- NEW: MEET & GREET OPTION --- */}
+        <div style={{ marginBottom: '20px', padding: '15px', background: '#000', borderRadius: '6px', border: '1px solid #333' }}>
+          <label style={{ color: '#C5A059', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem' }}>
+            <input 
+              type="checkbox" 
+              name="meetAndGreet" 
+              checked={formData.meetAndGreet} 
+              onChange={handleChange} 
+              style={{ width: '20px', height: '20px' }}
+            />
+            <span>Add Airport Meet & Greet (+$25.00)</span>
+          </label>
+        </div>
+
         <button type="submit" style={mobileButtonStyle} disabled={checking}>
           {checking ? "Checking Availability..." : "PROCEED TO DEPOSIT"}
         </button>
       </form>
+      
+      {/* --- UPDATED BADGE TEXT --- */}
+      <div style={{ marginTop: '30px', borderTop: '1px solid #222', paddingTop: '20px', textAlign: 'center' }}>
+         <h4 style={{ color: '#C5A059', margin: '0 0 5px 0', textTransform: 'uppercase', letterSpacing: '1px' }}>Executive Reliability</h4>
+         <p style={{ fontSize: '0.9rem', color: '#888', margin: 0, lineHeight: '1.4' }}>
+            Real-time flight tracking and chauffeur coordination ensure your vehicle is on-site before you land.
+         </p>
+      </div>
     </div>
   );
 };

@@ -13,7 +13,7 @@ const Admin = () => {
   const [markers, setMarkers] = useState([]);
 
   // UPDATED FOR WINDOWS VICTUS NETWORK ACCESS
-  const apiUrl = 'http://192.168.1.12:5000';
+  const apiUrl = 'http://192.168.1:5000';
   const ADMIN_SECRET = 'JoC03x3c2026';
   // Google Maps Loader (Preserved lines)
   const { isLoaded } = useJsApiLoader({

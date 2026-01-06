@@ -7,20 +7,18 @@ const fs = require('fs');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { Client } = require("@googlemaps/google-maps-services-js"); // Added for Mapping
 require('dotenv').config();
 
 // 1. DYNAMIC IP CONFIGURATION
-const LOCAL_IP = '192.168.1.12'; 
+const LOCAL_IP = '192.168.1.173'; 
 const PORT = process.env.PORT || 5000;
 const BASE_URL = `http://${LOCAL_IP}:${PORT}`; 
 
 console.log(`🚀 CONFIG: Server targeting ${BASE_URL}`);
 
-// Initialize Google Maps Client
-const googleMapsClient = new Client({});
-
+// Initialize Twilio
 const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_TOKEN);
+
 const app = express();
 
 const DB_FILE = path.join(__dirname, 'bookings.json');
@@ -42,10 +40,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// FIXED SQUARE INITIALIZATION FOR V36+ SDK
 const squareClient = new SquareClient({
-  accessToken: process.env.SQUARE_ACCESS_TOKEN,
-  environment: process.env.SQUARE_ENVIRONMENT === 'production' ? Environment.Production : Environment.Sandbox,
+  accessToken: process.env.SQUARE_ACCESS_TOKEN, 
+  environment: process.env.SQUARE_ENVIRONMENT === 'production' ? Environment.Production : Environment.Sandbox, 
 });
 
 const transporter = nodemailer.createTransport({
@@ -125,46 +122,37 @@ app.post('/api/auth/login', async (req, res) => {
   res.json({ token, user: { name: user.name, role: user.role, email: user.email, isApproved: user.isApproved } });
 });
 
-// --- DISPATCH & PAYMENT (WITH INTEGRATED GEOCODING) ---
+// --- DISPATCH & PAYMENT ---
 app.post('/api/process-payment', async (req, res) => {
   const { sourceId, amount, bookingDetails } = req.body;
   
   try {
-    // A. Geocode the address to get Coordinates for the Admin Map
-    let coords = { lat: 38.91, lng: -94.68 }; // Default: Overland Park
-    try {
-      const geoRes = await googleMapsClient.geocode({
-        params: {
-          address: bookingDetails.pickup,
-          key: process.env.REACT_APP_GOOGLE_MAPS_KEY 
-        }
-      });
-      if (geoRes.data.results.length > 0) {
-        coords = geoRes.data.results[0].geometry.location;
-      }
-    } catch (geoErr) {
-      console.error("📍 Geocoding error (using fallback):", geoErr.message);
+    // MEET & GREET + SPECIAL PRICING SERVER LOGIC
+    let finalAmount = BigInt(amount);
+    
+    // Add $25 for Meet & Greet if selected
+    if (bookingDetails.meetAndGreet) {
+      finalAmount += BigInt(2500); 
     }
 
-    // B. Process Square Payment
     const response = await squareClient.paymentsApi.createPayment({
       sourceId, 
       idempotencyKey: Date.now().toString(),
-      amountMoney: { amount: BigInt(amount), currency: 'USD' }
+      amountMoney: { amount: finalAmount, currency: 'USD' }
     });
 
-    // C. Save Booking with Coords
+    // Save Booking
     const newBooking = { 
         id: response.result.payment.id, 
         ...bookingDetails, 
-        coords, // Added for Mapping
-        amount, 
+        totalCharged: Number(finalAmount),
+        amount: Number(finalAmount), 
         driver: null, 
         bookedAt: new Date() 
     };
     saveBooking(newBooking);
     
-    // D. Dispatch Alerts
+    // Dispatch Alerts
     const approvedDrivers = getUsers().filter(u => u.role === 'driver' && u.isApproved === true);
     approvedDrivers.forEach(async (driver) => {
       const claimLink = `${BASE_URL}/api/claim-job?id=${newBooking.id}&driver=${driver.email}`;
@@ -173,20 +161,20 @@ app.post('/api/process-payment', async (req, res) => {
         from: `"JOCO EXEC" <${process.env.EMAIL_USER}>`, 
         to: driver.email,
         subject: `NEW JOB: ${newBooking.date}`,
-        html: `<p>Route: ${newBooking.pickup} -> ${newBooking.dropoff}</p><a href="${claimLink}" style="padding:15px; background:#C5A059; color:black; text-decoration:none; font-weight:bold; border-radius:4px;">ACCEPT JOB</a>`
+        html: `<p>Route: ${newBooking.pickup} -> ${newBooking.dropoff}</p><p>Meet & Greet: ${bookingDetails.meetAndGreet ? 'YES' : 'NO'}</p><a href="${claimLink}" style="padding:15px; background:#C5A059; color:black; text-decoration:none; font-weight:bold; border-radius:4px;">ACCEPT JOB</a>`
       });
 
       if (process.env.TWILIO_PHONE) {
         try {
           await twilioClient.messages.create({
-            body: `JOCO EXEC: New Job from ${newBooking.pickup}. Claim: ${claimLink}`,
+            body: `JOCO EXEC: New Job from ${newBooking.pickup}. ${bookingDetails.meetAndGreet ? '[MEET & GREET]' : ''} Claim: ${claimLink}`,
             from: process.env.TWILIO_PHONE,
             to: driver.phone || driver.email
           });
         } catch (smsErr) { console.error("SMS Error:", smsErr.message); }
       }
     });
-    res.json({ success: true });
+    res.json({ success: true, payment: response.result.payment });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -241,6 +229,7 @@ app.delete('/api/admin/bookings/:id', (req, res) => {
 // --- SERVE FRONTEND (STATIC FILES) ---
 app.use(express.static(path.join(__dirname, 'build')));
 
+// Using a Regex catch-all to satisfy Node v22 stricter path-to-regexp rules
 app.get(/^(?!\/api).+/, (req, res) => {
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
