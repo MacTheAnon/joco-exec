@@ -11,7 +11,7 @@ const { Client } = require("@googlemaps/google-maps-services-js"); // Added for 
 require('dotenv').config();
 
 // 1. DYNAMIC IP CONFIGURATION
-const LOCAL_IP = '192.168.1.4'; 
+const LOCAL_IP = '192.168.1.12'; 
 const PORT = process.env.PORT || 5000;
 const BASE_URL = `http://${LOCAL_IP}:${PORT}`; 
 

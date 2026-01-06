@@ -1,45 +1,19 @@
 {
-  "name": "joco-exec",
-  "proxy": "http://localhost:5000",
+  "name": "joco-exec-server",
   "version": "1.0.0",
-  "private": true,
+  "main": "server.js",
   "dependencies": {
-    "@ctrl/react-adsense": "^1.0.0",
-    "@googlemaps/google-maps-services-js": "^3.4.2",
-    "@react-google-maps/api": "^2.20.8",
-    "bcryptjs": "^3.0.3",
+    "express": "^4.18.2",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
-    "express": "^5.2.1",
-    "jsonwebtoken": "^9.0.3",
-    "lucide-react": "^0.292.0",
-    "node-cron": "^4.2.1",
-    "nodemailer": "^7.0.12",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.18.0",
-    "react-scripts": "5.0.1",
-    "react-square-web-payments-sdk": "^3.2.4-beta.1",
-    "recharts": "^3.6.0",
-    "square": "^43.2.1",
-    "twilio": "^5.11.1",
-    "web-vitals": "^2.1.0"
+    "dotenv": "^16.0.3",
+    "square": "^26.0.0",
+    "twilio": "^4.19.0",
+    "nodemailer": "^6.9.7",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version"
-    ]
+    "start": "node server.js",
+    "build-windows": "cd client && npm install && npm run build && rmdir /s /q ..\\build && move build ..\\"
   }
 }
