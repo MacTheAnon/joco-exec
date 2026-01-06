@@ -1,4 +1,4 @@
-const { SquareClient, SquareEnvironment } = require('square'); 
+const { Client: SquareClient, Environment } = require('square'); 
 const twilio = require('twilio');
 const express = require('express');
 const cors = require('cors');
@@ -42,9 +42,10 @@ app.use((req, res, next) => {
   next();
 });
 
+// FIXED SQUARE INITIALIZATION FOR V36+ SDK
 const squareClient = new SquareClient({
-  token: process.env.SQUARE_ACCESS_TOKEN, 
-  environment: SquareEnvironment.Sandbox, 
+  accessToken: process.env.SQUARE_ACCESS_TOKEN,
+  environment: process.env.SQUARE_ENVIRONMENT === 'production' ? Environment.Production : Environment.Sandbox,
 });
 
 const transporter = nodemailer.createTransport({
@@ -146,7 +147,7 @@ app.post('/api/process-payment', async (req, res) => {
     }
 
     // B. Process Square Payment
-    const response = await squareClient.payments.create({
+    const response = await squareClient.paymentsApi.createPayment({
       sourceId, 
       idempotencyKey: Date.now().toString(),
       amountMoney: { amount: BigInt(amount), currency: 'USD' }
@@ -154,7 +155,7 @@ app.post('/api/process-payment', async (req, res) => {
 
     // C. Save Booking with Coords
     const newBooking = { 
-        id: response.payment.id, 
+        id: response.result.payment.id, 
         ...bookingDetails, 
         coords, // Added for Mapping
         amount, 
@@ -240,10 +241,10 @@ app.delete('/api/admin/bookings/:id', (req, res) => {
 // --- SERVE FRONTEND (STATIC FILES) ---
 app.use(express.static(path.join(__dirname, 'build')));
 
-// Using a Regex catch-all to satisfy Node v22 stricter path-to-regexp rules
 app.get(/^(?!\/api).+/, (req, res) => {
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
+
 // BIND TO 0.0.0.0 TO ALLOW EXTERNAL CONNECTIONS (IPHONE)
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 JOCO EXEC running on port ${PORT}`);
