@@ -11,7 +11,7 @@ const DriverDashboard = () => {
       try {
         const token = localStorage.getItem('token');
         // UPDATED: Points to your new Windows Victus IP
-        const res = await fetch('http://192.168.1.173:5000/api/user/my-bookings', {
+        const res = await fetch('http://192.168.1.12:5000/api/user/my-bookings', {
           headers: { 'Authorization': token }
         });
         

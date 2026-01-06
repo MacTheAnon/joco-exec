@@ -13,7 +13,7 @@ const Login = ({ setUser }) => {
     setLoading(true);
     
     try {
-      const res = await fetch('http://192.168.1.173:5000/api/auth/login', {
+      const res = await fetch('http://192.168.1.12:5000/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
