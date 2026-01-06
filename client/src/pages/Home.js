@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Shield, Clock, Award } from 'lucide-react';
 import BookingForm from '../components/BookingForm';
-import SquarePayment from '../components/SquarePayment'; // Assuming this exists
+import SquarePayment from '../components/SquarePayment'; 
 
 const Home = () => {
   const [bookingData, setBookingData] = React.useState(null);
@@ -12,7 +12,7 @@ const Home = () => {
 
   return (
     <div>
-      {/* --- HERO SECTION --- */}
+      {/* HERO SECTION */}
       <section style={{ 
         background: 'linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url("/background.jpg")',
         backgroundSize: 'cover',
@@ -51,7 +51,7 @@ const Home = () => {
         </div>
       </section>
 
-      {/* --- FEATURES SECTION --- */}
+      {/* FEATURES SECTION */}
       <section style={{ background: '#1a1a1a', padding: '80px 20px', color: '#fff' }}>
         <div style={featuresGridStyle}>
           
@@ -63,7 +63,7 @@ const Home = () => {
             </p>
           </div>
 
-          {/* UPDATED BADGE HERE */}
+          {/* UPDATED BADGE */}
           <div style={featureItemStyle}>
             <Clock size={45} color="#C5A059" />
             <h3 style={{ fontSize: '1.3rem', marginTop: '15px', color: '#fff' }}>Executive Reliability</h3>

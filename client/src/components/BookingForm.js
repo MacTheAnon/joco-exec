@@ -2,15 +2,15 @@ import React, { useState } from 'react';
 
 const BookingForm = ({ onSubmit }) => {
   const [formData, setFormData] = useState({
-    date: '', 
-    time: '', 
-    pickup: '', 
-    dropoff: '', 
-    passengers: '1', 
-    name: '', 
-    email: '', 
+    name: '',
+    email: '',
     phone: '',
-    meetAndGreet: false // New Feature added
+    date: '',
+    time: '',
+    pickup: '',
+    dropoff: '',
+    meetAndGreet: false,
+    passengers: '1'
   });
   const [checking, setChecking] = useState(false);
 
@@ -38,7 +38,7 @@ const BookingForm = ({ onSubmit }) => {
         baseDeposit = 25000; // $250.00
       }
 
-      // UPDATED: Points to your new Windows Victus IP
+      // IP Check
       const apiUrl = process.env.REACT_APP_API_URL || 'http://192.168.1.173:5000';
       
       const response = await fetch(`${apiUrl}/api/check-availability`, {
@@ -50,7 +50,6 @@ const BookingForm = ({ onSubmit }) => {
       const data = await response.json();
 
       if (data.available) {
-        // Pass base amount (Server adds Meet & Greet fee)
         onSubmit({ ...formData, amount: baseDeposit }); 
       } else {
         alert("❌ Sorry, that time slot is already booked. Please choose another time.");
@@ -93,7 +92,7 @@ const BookingForm = ({ onSubmit }) => {
         </div>
 
         <label style={labelStyle}>Pickup Location</label>
-        <input type="text" name="pickup" style={mobileInputStyle} onChange={handleChange} placeholder="Street Address, Airport, or Hotel" required />
+        <input type="text" name="pickup" style={mobileInputStyle} onChange={handleChange} placeholder="Address, Airport, or Hotel" required />
 
         <label style={labelStyle}>Dropoff Location</label>
         <input type="text" name="dropoff" style={mobileInputStyle} onChange={handleChange} placeholder="Destination Address" required />
@@ -128,60 +127,12 @@ const BookingForm = ({ onSubmit }) => {
   );
 };
 
+// Styles (Preserved)
 const isMobile = window.innerWidth < 600;
-
-const formCardStyle = {
-  background: '#111', 
-  border: '1px solid #C5A059', 
-  padding: isMobile ? '20px' : '35px', 
-  borderRadius: '12px', 
-  maxWidth: '500px', 
-  margin: '0 auto', 
-  color: '#fff',
-  boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
-};
-
-const labelStyle = { 
-  display: 'block', 
-  marginBottom: '8px', 
-  color: '#C5A059', 
-  fontWeight: 'bold', 
-  fontSize: '0.9rem',
-  letterSpacing: '0.5px'
-};
-
-const mobileInputStyle = { 
-  width: '100%', 
-  padding: '14px', 
-  marginBottom: '20px', 
-  background: '#000', 
-  border: '1px solid #333', 
-  color: '#fff', 
-  borderRadius: '6px', 
-  boxSizing: 'border-box',
-  fontSize: '16px', 
-  fontFamily: 'inherit'
-};
-
-const responsiveGrid = {
-  display: 'flex', 
-  flexDirection: isMobile ? 'column' : 'row', 
-  gap: isMobile ? '0px' : '15px' 
-};
-
-const mobileButtonStyle = { 
-  width: '100%', 
-  padding: '18px', 
-  background: '#C5A059', 
-  color: '#000', 
-  border: 'none', 
-  fontWeight: 'bold', 
-  fontSize: '1rem', 
-  cursor: 'pointer', 
-  marginTop: '10px',
-  borderRadius: '6px',
-  textTransform: 'uppercase',
-  letterSpacing: '1px'
-};
+const formCardStyle = { background: '#111', border: '1px solid #C5A059', padding: isMobile ? '20px' : '35px', borderRadius: '12px', maxWidth: '500px', margin: '0 auto', color: '#fff', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' };
+const labelStyle = { display: 'block', marginBottom: '8px', color: '#C5A059', fontWeight: 'bold', fontSize: '0.9rem', letterSpacing: '0.5px' };
+const mobileInputStyle = { width: '100%', padding: '14px', marginBottom: '20px', background: '#000', border: '1px solid #333', color: '#fff', borderRadius: '6px', boxSizing: 'border-box', fontSize: '16px', fontFamily: 'inherit' };
+const responsiveGrid = { display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '0px' : '15px' };
+const mobileButtonStyle = { width: '100%', padding: '18px', background: '#C5A059', color: '#000', border: 'none', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', marginTop: '10px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '1px' };
 
 export default BookingForm;
