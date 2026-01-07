@@ -2,30 +2,55 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 
 const Register = () => {
+  // --- STATE MANAGEMENT ---
   const [formData, setFormData] = useState({ 
     name: '', 
     username: '', 
     email: '', 
     password: '', 
+    companyName: '', // For Corporate Accounts
     role: 'customer' // Default role
   });
+  
+  const [isCorporate, setIsCorporate] = useState(false);
+  const [isDriver, setIsDriver] = useState(false);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  // Handle Input Changes
+  // --- HANDLERS ---
+
+  // Handle Text Inputs
   const handleChange = (e) => {
-    // Handle Checkbox logic for Driver role
-    if (e.target.name === 'isDriver') {
-        setFormData({ ...formData, role: e.target.checked ? 'driver' : 'customer' });
-    } else {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-    }
-    // Clear error when typing
+    setFormData({ ...formData, [e.target.name]: e.target.value });
     if (error) setError('');
   };
 
+  // Handle Role Toggles (Corporate vs Driver)
+  const handleRoleChange = (type) => {
+    if (type === 'corporate') {
+        const newState = !isCorporate;
+        setIsCorporate(newState);
+        setIsDriver(false); // Can't be both
+        setFormData({ 
+            ...formData, 
+            role: newState ? 'corporate' : 'customer',
+            companyName: newState ? formData.companyName : '' // Clear company if unchecked
+        });
+    } else if (type === 'driver') {
+        const newState = !isDriver;
+        setIsDriver(newState);
+        setIsCorporate(false); // Can't be both
+        setFormData({ 
+            ...formData, 
+            role: newState ? 'driver' : 'customer',
+            companyName: '' 
+        });
+    }
+  };
+
+  // Submit Form to Server
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -54,22 +79,25 @@ const Register = () => {
     }
   };
 
+  // --- RENDER ---
   return (
     <div style={containerStyle}>
       <div style={overlayStyle}>
         <div style={cardStyle}>
           
-          {/* Header Section */}
+          {/* HEADER */}
           <div style={headerStyle}>
             <h1 style={logoStyle}>JOCO EXEC</h1>
             <h2 style={titleStyle}>Create Account</h2>
             <p style={subtitleStyle}>Join our premium transportation network</p>
           </div>
 
-          {/* Error Message */}
+          {/* ERROR MESSAGE */}
           {error && <div style={errorStyle}>{error}</div>}
 
+          {/* FORM */}
           <form onSubmit={handleSubmit}>
+            
             {/* Full Name */}
             <div style={inputGroupStyle}>
               <label style={labelStyle}>Full Name</label>
@@ -83,7 +111,7 @@ const Register = () => {
               />
             </div>
 
-            {/* Username (NEW) */}
+            {/* Username */}
             <div style={inputGroupStyle}>
               <label style={labelStyle}>Username</label>
               <input 
@@ -95,6 +123,21 @@ const Register = () => {
                 style={inputStyle} 
               />
             </div>
+
+            {/* Company Name (CONDITIONAL) */}
+            {isCorporate && (
+                <div style={inputGroupStyle}>
+                    <label style={labelStyle}>Company Name</label>
+                    <input 
+                        type="text" 
+                        name="companyName" 
+                        placeholder="Business Name LLC" 
+                        onChange={handleChange} 
+                        required 
+                        style={inputStyle} 
+                    />
+                </div>
+            )}
 
             {/* Email */}
             <div style={inputGroupStyle}>
@@ -122,19 +165,25 @@ const Register = () => {
               />
             </div>
 
-            {/* Driver Role Checkbox */}
-            <div style={checkboxContainerStyle}>
-              <label style={{ ...labelStyle, marginBottom: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#fff' }}>
-                <input 
-                  type="checkbox" 
-                  name="isDriver" 
-                  onChange={handleChange} 
-                  style={{ marginRight: '10px', width: '18px', height: '18px', accentColor: '#C5A059' }} 
-                />
-                Register as a Chauffeur / Driver
-              </label>
+            {/* ACCOUNT TYPE TOGGLES */}
+            <div style={{ display: 'flex', gap: '15px', marginBottom: '25px' }}>
+                <div 
+                    onClick={() => handleRoleChange('corporate')}
+                    style={isCorporate ? activeToggleStyle : inactiveToggleStyle}
+                >
+                    <span style={{ fontSize: '1.2rem', display: 'block', marginBottom: '5px' }}>🏢</span>
+                    Corporate
+                </div>
+                <div 
+                    onClick={() => handleRoleChange('driver')}
+                    style={isDriver ? activeToggleStyle : inactiveToggleStyle}
+                >
+                    <span style={{ fontSize: '1.2rem', display: 'block', marginBottom: '5px' }}>🚘</span>
+                    Driver
+                </div>
             </div>
 
+            {/* SUBMIT BUTTON */}
             <button 
               type="submit" 
               disabled={loading} 
@@ -144,13 +193,11 @@ const Register = () => {
             </button>
           </form>
 
-          {/* Footer Links */}
+          {/* FOOTER */}
           <div style={footerStyle}>
             <p style={{ color: '#888', margin: 0 }}>
               Already have an account?{' '}
-              <Link to="/login" style={linkStyle}>
-                Log In
-              </Link>
+              <Link to="/login" style={linkStyle}>Log In</Link>
             </p>
           </div>
 
@@ -160,7 +207,7 @@ const Register = () => {
   );
 };
 
-// --- PROFESSIONAL STYLES (Matches Login.js) ---
+// --- PROFESSIONAL STYLES ---
 
 const containerStyle = {
   minHeight: '100vh',
@@ -180,7 +227,7 @@ const overlayStyle = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  padding: '40px 20px', // Added padding for scrollability on small screens
+  padding: '40px 20px',
 };
 
 const cardStyle = {
@@ -214,12 +261,27 @@ const inputStyle = {
   transition: 'border-color 0.3s ease',
 };
 
-const checkboxContainerStyle = {
-  background: '#1a1a1a',
-  padding: '15px',
-  borderRadius: '6px',
-  border: '1px solid #333',
-  marginBottom: '20px'
+// Toggle Button Styles
+const inactiveToggleStyle = { 
+    flex: 1, 
+    padding: '15px', 
+    background: '#1a1a1a', 
+    border: '1px solid #333', 
+    borderRadius: '8px', 
+    color: '#888', 
+    textAlign: 'center', 
+    cursor: 'pointer', 
+    fontSize: '0.9rem',
+    transition: 'all 0.2s ease'
+};
+
+const activeToggleStyle = { 
+    ...inactiveToggleStyle, 
+    background: '#C5A059', 
+    color: '#000', 
+    fontWeight: 'bold', 
+    borderColor: '#C5A059',
+    transform: 'scale(1.02)'
 };
 
 const buttonStyle = {

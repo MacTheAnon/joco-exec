@@ -12,10 +12,10 @@ const Admin = () => {
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [markers, setMarkers] = useState([]);
 
-  // UPDATED FOR WINDOWS VICTUS NETWORK ACCESS
-  const apiUrl = 'http://192.168.1:5000';
-  const ADMIN_SECRET = 'JoC03x3c2026';
-  // Google Maps Loader (Preserved lines)
+  // --- FIXED IP ADDRESS (Added .12) ---
+  const apiUrl = 'http://192.168.1.12:5000';
+  
+  // Google Maps Loader
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_KEY
@@ -23,6 +23,8 @@ const Admin = () => {
 
   const fetchData = async (e) => {
     if (e) e.preventDefault();
+    setError('');
+    
     try {
       const bookRes = await fetch(`${apiUrl}/api/admin/bookings`, {
         headers: { 'Authorization': password }
@@ -33,7 +35,7 @@ const Admin = () => {
       });
 
       if (bookRes.status === 401 || userRes.status === 401) {
-        setError('Wrong Password');
+        setError('❌ Access Denied: Incorrect Password');
         return;
       }
       
@@ -41,13 +43,13 @@ const Admin = () => {
       const userData = await userRes.json();
       setBookings(bookData);
       setUsers(userData);
-      setError('');
     } catch (err) {
-      setError('Connection Error - Is the server running?');
+      console.error(err);
+      setError('❌ Connection Error. Ensure server is running on 192.168.1.12');
     }
   };
 
-  // Map Pins Logic (Preserved lines)
+  // Map Pins Logic
   useEffect(() => {
     if (bookings) {
       const validMarkers = bookings
@@ -84,7 +86,10 @@ const Admin = () => {
     });
     if (res.ok) {
       alert(`Driver ${email} is now approved for dispatch.`);
-      fetchData(); 
+      // Refresh Data without full reload
+      const userRes = await fetch(`${apiUrl}/api/admin/users`, { headers: { 'Authorization': password } });
+      const userData = await userRes.json();
+      setUsers(userData);
     }
   };
 
@@ -104,7 +109,7 @@ const Admin = () => {
     });
   };
 
-  // KPI & Filter Logic (Preserved lines)
+  // KPI & Filter Logic
   const totalRevenue = bookings ? bookings.reduce((sum, b) => sum + (Number(b.amount) / 100), 0) : 0;
   const driverCount = users.filter(u => u.role === 'driver' && u.isApproved).length;
 
@@ -129,12 +134,12 @@ const Admin = () => {
           />
           <button type="submit" style={loginBtn}>ACCESS FLEET DATA</button>
         </form>
-        {error && <p style={{color: '#ff4d4d', marginTop: '15px'}}>{error}</p>}
+        {error && <p style={{color: '#ff4d4d', marginTop: '15px', textAlign: 'center'}}>{error}</p>}
       </div>
     );
   }
 
-  // Dashboard View (Preserved styles and structure)
+  // Dashboard View
   return (
     <div style={{padding: '20px', minHeight: '100vh', background: '#f8f9fa', maxWidth: '1200px', margin: '0 auto'}}>
       <div style={headerNav}>
@@ -295,7 +300,7 @@ const Admin = () => {
   );
 };
 
-// --- STYLES (Unchanged) ---
+// --- STYLES ---
 const darkMapTheme = [{"elementType":"geometry","stylers":[{"color":"#212121"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#757575"}]},{"featureType":"road","elementType":"geometry","stylers":[{"color":"#484848"}]}];
 const sectionTitle = { marginTop: 0, fontSize: '1rem', color: '#333', marginBottom: '15px' };
 const mapWrapper = { background: '#fff', padding: '20px', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', marginBottom: '30px' };
