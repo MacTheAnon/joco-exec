@@ -14,11 +14,12 @@ require('dotenv').config();
 // 1. SERVER CONFIGURATION (PRODUCTION)
 // ==========================================
 
-// THE REAL DOMAIN (Updated from Local IP)
+// THE REAL DOMAIN
 const BASE_URL = 'https://www.jocoexec.com'; 
-const PORT = process.env.PORT || 5000;
+// CRITICAL: Railway provides the PORT env var. Fallback to 8080 if local.
+const PORT = process.env.PORT || 8080;
 
-console.log(`🚀 CONFIG: Server targeting ${BASE_URL}`);
+console.log(`🚀 CONFIG: Server targeting ${BASE_URL} on PORT ${PORT}`);
 
 // Initialize Clients
 const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_TOKEN);
@@ -185,7 +186,7 @@ app.post('/api/process-payment', async (req, res) => {
     };
     saveBooking(newBooking);
     
-    // Email Dispatch to Approved Drivers (UPDATED LINK)
+    // Email Dispatch to Approved Drivers
     const approvedDrivers = getUsers().filter(u => u.role === 'driver' && u.isApproved === true);
     approvedDrivers.forEach(async (driver) => {
       transporter.sendMail({
@@ -234,13 +235,16 @@ app.delete('/api/admin/bookings/:id', (req, res) => {
 });
 
 // Serve Frontend (Must be last)
-// FIXED FOR EXPRESS 5: Using regex /.*/ instead of string '*'
 app.use(express.static(path.join(__dirname, 'build')));
 app.get(/.*/, (req, res) => {
     res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
-// Start Server
+// ==========================================
+// 6. START SERVER (FIXED)
+// ==========================================
+
+// CRITICAL FIX: Only call app.listen ONCE.
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 JOCO EXEC running on port ${PORT}`);
   console.log(`🔗 Local:   http://localhost:${PORT}`);
