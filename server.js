@@ -1,5 +1,5 @@
-// UPDATED FOR SQUARE SDK (Standard 'Client' import)
-const { Client, Environment } = require('square'); 
+// UPDATED FOR SQUARE SDK v40+ (The "New" SDK)
+const { SquareClient, SquareEnvironment } = require('square'); 
 const twilio = require('twilio');
 const express = require('express');
 const cors = require('cors');
@@ -11,12 +11,17 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 // ==========================================
+// 0. BIGINT FIX (CRITICAL FOR NEW SQUARE SDK)
+// ==========================================
+// The new Square SDK uses "BigInt" for money. 
+// JSON.stringify crashes on BigInt, so we add this helper to convert it to a string.
+BigInt.prototype.toJSON = function() { return this.toString(); };
+
+// ==========================================
 // 1. SERVER CONFIGURATION (PRODUCTION)
 // ==========================================
 
-// THE REAL DOMAIN
 const BASE_URL = 'https://www.jocoexec.com'; 
-// CRITICAL: Railway provides the PORT env var. Fallback to 8080 if local.
 const PORT = process.env.PORT || 8080;
 
 console.log(`🚀 CONFIG: Server targeting ${BASE_URL} on PORT ${PORT}`);
@@ -52,13 +57,12 @@ app.use((req, res, next) => {
 // 3. EXTERNAL SERVICES SETUP
 // ==========================================
 
-// --- FIXED SQUARE CLIENT ---
-// Use 'Client' instead of 'SquareClient' for the official SDK
-const squareClient = new Client({
-  accessToken: process.env.SQUARE_ACCESS_TOKEN, 
+// --- CORRECTED CLIENT FOR SDK v40+ ---
+const squareClient = new SquareClient({
+  token: process.env.SQUARE_ACCESS_TOKEN, 
   environment: process.env.SQUARE_ENVIRONMENT === 'production' 
-    ? Environment.Production 
-    : Environment.Sandbox, 
+    ? SquareEnvironment.Production 
+    : SquareEnvironment.Sandbox, 
 });
 
 const transporter = nodemailer.createTransport({
@@ -112,7 +116,6 @@ app.post('/api/check-availability', (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   const { identifier, password } = req.body;
   
-  // MASTER ADMIN BYPASS (Hardcoded Admin)
   if ((identifier === 'kalebm.lord@gmail.com' || identifier === 'admin') && password === 'JoC03x3c2026') {
       console.log("👑 MASTER ADMIN LOGGED IN");
       const token = jwt.sign({ id: 'master-admin', email: 'admin', role: 'admin' }, SECRET_KEY, { expiresIn: '1d' });
@@ -133,7 +136,7 @@ app.post('/api/auth/login', async (req, res) => {
   res.json({ token, user: { name: user.name, role: user.role, email: user.email, isApproved: user.isApproved } });
 });
 
-// --- REGISTER (Handles Corporate & Drivers) ---
+// --- REGISTER ---
 app.post('/api/auth/register', async (req, res) => {
   const { name, username, email, password, role, companyName } = req.body;
   
@@ -161,23 +164,22 @@ app.post('/api/auth/register', async (req, res) => {
   res.json({ success: true, token, user: { name: newUser.name, role: newUser.role, email: newUser.email, isApproved: newUser.isApproved } });
 });
 
-// --- PROCESS PAYMENT ---
+// --- PROCESS PAYMENT (UPDATED FOR NEW SDK) ---
 app.post('/api/process-payment', async (req, res) => {
   const { sourceId, amount, bookingDetails } = req.body;
   
   try {
-    // 1. Prepare BigInt for Square
+    // 1. Prepare BigInt for Square (New Requirement)
     let finalAmount = BigInt(amount);
     
-    // Safety check: ensure bookingDetails exists
     if (bookingDetails && bookingDetails.meetAndGreet) {
       finalAmount += BigInt(2500); 
     }
 
-    // 2. Call Square API (Now using correct squareClient)
-    const response = await squareClient.paymentsApi.createPayment({
+    // 2. Call Square API (Updated Method: client.payments.create)
+    const response = await squareClient.payments.create({
       sourceId, 
-      idempotencyKey: Date.now().toString(), // Using simple timestamp for uniqueness
+      idempotencyKey: Date.now().toString(),
       amountMoney: { amount: finalAmount, currency: 'USD' }
     });
 
@@ -185,14 +187,14 @@ app.post('/api/process-payment', async (req, res) => {
     const newBooking = { 
         id: response.result.payment.id, 
         ...bookingDetails, 
-        totalCharged: Number(finalAmount), // Convert BigInt to Number
+        totalCharged: Number(finalAmount),
         status: 'PAID',
         driver: null, 
         bookedAt: new Date() 
     };
     saveBooking(newBooking);
     
-    // 4. Email Dispatch to Approved Drivers
+    // 4. Email Dispatch
     const approvedDrivers = getUsers().filter(u => u.role === 'driver' && u.isApproved === true);
     approvedDrivers.forEach(async (driver) => {
       transporter.sendMail({
@@ -207,12 +209,15 @@ app.post('/api/process-payment', async (req, res) => {
       });
     });
 
+    // 5. Send Success Response
+    // (BigInt.prototype.toJSON above handles the serialization here)
     res.json({ success: true, paymentId: response.result.payment.id });
 
   } catch (e) { 
     console.error("Payment Error:", e);
-    // Be careful not to send BigInts in the error response
-    res.status(500).json({ error: e.message || "Payment Processing Failed" }); 
+    // Return the specific error message from Square if available
+    const errorMsg = e.errors ? e.errors[0].detail : (e.message || "Payment Processing Failed");
+    res.status(500).json({ error: errorMsg }); 
   }
 });
 
