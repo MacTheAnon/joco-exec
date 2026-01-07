@@ -10,7 +10,7 @@ const Dashboard = () => {
       try {
         const token = localStorage.getItem('token');
         // Dynamic API URL for Mobile/Linux testing
-        const apiUrl = process.env.REACT_APP_API_URL || 'http://192.168.1.12:5000';
+        const apiUrl = process.env.REACT_APP_API_URL || 'https://www.jocoexec.com';
         
         const res = await fetch(`${apiUrl}/api/user/my-bookings`, {
           headers: { 

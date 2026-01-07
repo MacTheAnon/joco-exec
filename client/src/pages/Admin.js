@@ -13,7 +13,7 @@ const Admin = () => {
   const [markers, setMarkers] = useState([]);
 
   // --- FIXED IP ADDRESS (Added .12) ---
-  const apiUrl = 'http://192.168.1.12:5000';
+  const apiUrl = 'https://www.jocoexec.com';
   
   // Google Maps Loader
   const { isLoaded } = useJsApiLoader({

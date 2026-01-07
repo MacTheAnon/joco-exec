@@ -2,7 +2,7 @@
   "name": "joco-exec-client",
   "version": "0.1.0",
   "private": true,
-  "proxy": "http://localhost:5000",
+  "proxy": "https://www.jocoexec.com",
   "dependencies": {
     "@ctrl/react-adsense": "^1.0.0",
     "@react-google-maps/api": "^2.20.8",

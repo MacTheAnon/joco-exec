@@ -38,7 +38,7 @@ const SquarePayment = ({ onSuccess, bookingDetails }) => {
           setIsSubmitting(true);
           try {
             // UPDATED IP ADDRESS
-            const apiUrl = process.env.REACT_APP_API_URL || 'http://192.168.1.12:5000';
+            const apiUrl = process.env.REACT_APP_API_URL || 'https://www.jocoexec.com';
             
             const response = await fetch(`${apiUrl}/api/process-payment`, {
               method: 'POST',
@@ -58,7 +58,7 @@ const SquarePayment = ({ onSuccess, bookingDetails }) => {
               setIsSubmitting(false);
             }
           } catch (error) {
-            alert('Network Error. Ensure Server is running on 192.168.1.12');
+            alert('Network Error. Ensure Server is running on https://www.jocoexec.com');
             setIsSubmitting(false);
           }
         }}

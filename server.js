@@ -247,6 +247,5 @@ app.get(/.*/, (req, res) => {
 // CRITICAL FIX: Only call app.listen ONCE.
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 JOCO EXEC running on port ${PORT}`);
-  console.log(`🔗 Local:   http://localhost:${PORT}`);
   console.log(`🔗 Network: http://${BASE_URL}`);
 });
