@@ -45,7 +45,7 @@ const Admin = () => {
       setUsers(userData);
     } catch (err) {
       console.error(err);
-      setError('❌ Connection Error. Ensure server is running on 192.168.1.12');
+      setError('❌ Connection Error. Ensure server is running on https://www.jocoexec.com');
     }
   };
 
