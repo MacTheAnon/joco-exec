@@ -62,9 +62,8 @@ const BookingForm = ({ onSubmit }) => {
         calculatedAmount = 25000; 
       }
 
-      // --- CHECK AVAILABILITY ---
-      // Uses your local IP address
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://192.168.1.12:5000';
+      // --- CHECK AVAILABILITY (PRODUCTION URL) ---
+      const apiUrl = 'https://www.jocoexec.com';
       
       const response = await fetch(`${apiUrl}/api/check-availability`, {
         method: 'POST',

@@ -57,8 +57,8 @@ const Register = () => {
     setError('');
 
     try {
-      // UPDATED IP ADDRESS: 192.168.1.12
-      const res = await fetch('http://192.168.1.12:5000/api/auth/register', {
+      // ✅ PRODUCTION URL: https://www.jocoexec.com
+      const res = await fetch('https://www.jocoexec.com/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)

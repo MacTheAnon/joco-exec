@@ -11,13 +11,12 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 // ==========================================
-// 1. SERVER CONFIGURATION
+// 1. SERVER CONFIGURATION (PRODUCTION)
 // ==========================================
 
-// KEEP THIS AS YOUR LOCAL IP for testing on iPhone
-const LOCAL_IP = '192.168.1.12'; 
+// THE REAL DOMAIN (Updated from Local IP)
+const BASE_URL = 'https://www.jocoexec.com'; 
 const PORT = process.env.PORT || 5000;
-const BASE_URL = `http://${LOCAL_IP}:${PORT}`; 
 
 console.log(`🚀 CONFIG: Server targeting ${BASE_URL}`);
 
@@ -54,7 +53,7 @@ app.use((req, res, next) => {
 
 // --- UPDATED SQUARE CLIENT (v43+) ---
 const squareClient = new SquareClient({
-  token: process.env.SQUARE_ACCESS_TOKEN, // 'token' replaces 'accessToken' in v43
+  token: process.env.SQUARE_ACCESS_TOKEN, 
   environment: process.env.SQUARE_ENVIRONMENT === 'production' 
     ? SquareEnvironment.Production 
     : SquareEnvironment.Sandbox, 
@@ -186,14 +185,18 @@ app.post('/api/process-payment', async (req, res) => {
     };
     saveBooking(newBooking);
     
-    // Email Dispatch to Approved Drivers
+    // Email Dispatch to Approved Drivers (UPDATED LINK)
     const approvedDrivers = getUsers().filter(u => u.role === 'driver' && u.isApproved === true);
     approvedDrivers.forEach(async (driver) => {
       transporter.sendMail({
         from: `"JOCO EXEC" <${process.env.EMAIL_USER}>`, 
         to: driver.email,
         subject: `NEW JOB: ${newBooking.date}`,
-        html: `<p>New Job Available. Log in to claim.</p>`
+        html: `
+          <h3>New Job Available</h3>
+          <p>Date: ${newBooking.date} @ ${newBooking.time}</p>
+          <p>Login to claim: <a href="${BASE_URL}/login">${BASE_URL}/login</a></p>
+        `
       });
     });
 
@@ -201,7 +204,6 @@ app.post('/api/process-payment', async (req, res) => {
 
   } catch (e) { 
     console.error("Payment Error:", e);
-    // V43 Error Handling uses JSON.stringify for cleaner logs
     res.status(500).json({ error: e.message || "Payment Processing Failed" }); 
   }
 });
@@ -232,6 +234,7 @@ app.delete('/api/admin/bookings/:id', (req, res) => {
 });
 
 // Serve Frontend (Must be last)
+// FIXED FOR EXPRESS 5: Using regex /.*/ instead of string '*'
 app.use(express.static(path.join(__dirname, 'build')));
 app.get(/.*/, (req, res) => {
     res.sendFile(path.join(__dirname, 'build', 'index.html'));
@@ -241,5 +244,5 @@ app.get(/.*/, (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 JOCO EXEC running on port ${PORT}`);
   console.log(`🔗 Local:   http://localhost:${PORT}`);
-  console.log(`🔗 Network: http://${LOCAL_IP}:${PORT}`);
+  console.log(`🔗 Network: http://${BASE_URL}`);
 });
