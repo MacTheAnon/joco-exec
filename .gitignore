@@ -4,3 +4,4 @@ build/
 bookings.json
 users.json
 .DS_Store
+server.js
