@@ -4,18 +4,18 @@
   "main": "server.js",
   "dependencies": {
     "@googlemaps/google-maps-services-js": "^3.4.2",
-    "bcryptjs": "^2.4.3",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
-    "dotenv": "^16.6.1",
-    "express": "^4.22.1",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "node-cron": "^4.2.1",
-    "nodemailer": "^6.10.1",
-    "square": "^26.0.0",
-    "twilio": "^4.23.0"
+    "nodemailer": "^7.0.12",
+    "square": "^43.2.1",
+    "twilio": "^5.11.1"
   },
   "scripts": {
     "start": "node server.js",
-    "build-windows": "cd client && npm install && npm run build && rmdir /s /q ..\\build && move build ..\\"
+    "build": "cd client && npm install && npm run build && rm -rf ../build && mv build ../"
   }
 }
