@@ -258,5 +258,5 @@ app.get(/.*/, (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 JOCO EXEC running on port ${PORT}`);
-  console.log(`🔗 Network: http://${BASE_URL}`);
+  console.log(`🔗 Network: ${BASE_URL}`);
 });
