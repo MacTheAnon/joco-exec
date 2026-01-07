@@ -1,5 +1,5 @@
-// UPDATED FOR SQUARE SDK v43+
-const { SquareClient, SquareEnvironment } = require('square'); 
+// UPDATED FOR SQUARE SDK (Standard 'Client' import)
+const { Client, Environment } = require('square'); 
 const twilio = require('twilio');
 const express = require('express');
 const cors = require('cors');
@@ -52,12 +52,13 @@ app.use((req, res, next) => {
 // 3. EXTERNAL SERVICES SETUP
 // ==========================================
 
-// --- UPDATED SQUARE CLIENT (v43+) ---
-const squareClient = new SquareClient({
-  token: process.env.SQUARE_ACCESS_TOKEN, 
+// --- FIXED SQUARE CLIENT ---
+// Use 'Client' instead of 'SquareClient' for the official SDK
+const squareClient = new Client({
+  accessToken: process.env.SQUARE_ACCESS_TOKEN, 
   environment: process.env.SQUARE_ENVIRONMENT === 'production' 
-    ? SquareEnvironment.Production 
-    : SquareEnvironment.Sandbox, 
+    ? Environment.Production 
+    : Environment.Sandbox, 
 });
 
 const transporter = nodemailer.createTransport({
@@ -165,28 +166,33 @@ app.post('/api/process-payment', async (req, res) => {
   const { sourceId, amount, bookingDetails } = req.body;
   
   try {
+    // 1. Prepare BigInt for Square
     let finalAmount = BigInt(amount);
-    if (bookingDetails.meetAndGreet) {
+    
+    // Safety check: ensure bookingDetails exists
+    if (bookingDetails && bookingDetails.meetAndGreet) {
       finalAmount += BigInt(2500); 
     }
 
+    // 2. Call Square API (Now using correct squareClient)
     const response = await squareClient.paymentsApi.createPayment({
       sourceId, 
-      idempotencyKey: Date.now().toString(),
+      idempotencyKey: Date.now().toString(), // Using simple timestamp for uniqueness
       amountMoney: { amount: finalAmount, currency: 'USD' }
     });
 
+    // 3. Save to Local DB (Convert BigInt to Number for JSON safety)
     const newBooking = { 
         id: response.result.payment.id, 
         ...bookingDetails, 
-        totalCharged: Number(finalAmount), 
+        totalCharged: Number(finalAmount), // Convert BigInt to Number
         status: 'PAID',
         driver: null, 
         bookedAt: new Date() 
     };
     saveBooking(newBooking);
     
-    // Email Dispatch to Approved Drivers
+    // 4. Email Dispatch to Approved Drivers
     const approvedDrivers = getUsers().filter(u => u.role === 'driver' && u.isApproved === true);
     approvedDrivers.forEach(async (driver) => {
       transporter.sendMail({
@@ -205,6 +211,7 @@ app.post('/api/process-payment', async (req, res) => {
 
   } catch (e) { 
     console.error("Payment Error:", e);
+    // Be careful not to send BigInts in the error response
     res.status(500).json({ error: e.message || "Payment Processing Failed" }); 
   }
 });
@@ -241,10 +248,9 @@ app.get(/.*/, (req, res) => {
 });
 
 // ==========================================
-// 6. START SERVER (FIXED)
+// 6. START SERVER
 // ==========================================
 
-// CRITICAL FIX: Only call app.listen ONCE.
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 JOCO EXEC running on port ${PORT}`);
   console.log(`🔗 Network: http://${BASE_URL}`);
