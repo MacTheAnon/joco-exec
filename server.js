@@ -320,10 +320,10 @@ app.delete('/api/admin/bookings/:id', (req, res) => {
 // ==========================================
 
 // ✅ CORRECTED PATH to match your folder structure
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'client', 'build')));
 
 app.get(/.*/, (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(__dirname, 'client', 'build', 'index.html'));
 });
 
 app.listen(PORT, '0.0.0.0', () => {
