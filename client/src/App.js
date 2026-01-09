@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
+import CookieConsent from "react-cookie-consent"; // ✅ NEW IMPORT
 
 // Import Pages
 import Home from './pages/Home';
-import Booking from './pages/Booking'; // ✅ Your new Booking Page
+import Booking from './pages/Booking';
 import Login from './pages/Login';
 import Register from './pages/Register'; 
 import Dashboard from './pages/Dashboard';
@@ -20,7 +21,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
-  // FIX: Track window size in state so the menu updates instantly on resize/rotate
+  // Track window size in state so the menu updates instantly on resize/rotate
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
@@ -69,7 +70,7 @@ function App() {
           <button 
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             style={{
-              display: isMobile ? 'block' : 'none', // ✅ Uses state variable
+              display: isMobile ? 'block' : 'none', 
               background: 'none',
               border: 'none',
               color: '#C5A059',
@@ -82,7 +83,7 @@ function App() {
           
           {/* Navigation Links */}
           <div style={{
-            display: (isMenuOpen || !isMobile) ? 'flex' : 'none', // ✅ Uses state variable
+            display: (isMenuOpen || !isMobile) ? 'flex' : 'none',
             flexDirection: isMobile ? 'column' : 'row',
             position: isMobile ? 'absolute' : 'static',
             top: '65px',
@@ -130,6 +131,35 @@ function App() {
             <Route path="/driver-dashboard" element={user && user.role === 'driver' ? <DriverDashboard /> : <Navigate to="/login" />} />
           </Routes>
         </div>
+
+        {/* ✅ CONSENT BANNER (Gold & Black Theme) */}
+        <CookieConsent
+          location="bottom"
+          buttonText="I Understand"
+          cookieName="joco_cookie_consent"
+          style={{ 
+            background: "#111", 
+            borderTop: "1px solid #C5A059", 
+            alignItems: "center",
+            zIndex: 9999 
+          }}
+          buttonStyle={{ 
+            background: "#C5A059", 
+            color: "#000", 
+            fontSize: "14px", 
+            fontWeight: "bold", 
+            borderRadius: "4px",
+            padding: "10px 20px"
+          }}
+          expires={150}
+        >
+          <span style={{ color: "#ccc" }}>
+            This website uses cookies to ensure you get the best experience on our booking platform. 
+            <a href="/privacy" style={{ color: "#C5A059", textDecoration: "underline", marginLeft: "5px" }}>
+              Privacy Policy
+            </a>
+          </span>
+        </CookieConsent>
 
         <Footer />
       </div>
