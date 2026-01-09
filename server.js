@@ -54,62 +54,10 @@ const transporter = nodemailer.createTransport({
 // ==========================================
 // 3. MIDDLEWARE SETUP (✅ FIXED SECURITY RULES)
 // ==========================================
+// Keep Helmet for basic security, but turn off the strict blocking rules (CSP)
 app.use(helmet({
-  contentSecurityPolicy: {
-    useDefaults: false, // distinct from the previous code, ensures we don't inherit strict defaults
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: [
-        "'self'",
-        "'unsafe-inline'", 
-        "https://www.googletagmanager.com",
-        "https://web.squarecdn.com",
-        "https://squareup.com",
-        "https://maps.googleapis.com"
-      ],
-      styleSrc: [
-        "'self'",
-        "'unsafe-inline'",
-        "https://fonts.googleapis.com",
-        "https://web.squarecdn.com"
-      ],
-      fontSrc: [
-        "'self'",
-        "https://fonts.gstatic.com",
-        "https://web.squarecdn.com"
-      ],
-      imgSrc: [
-        "'self'",
-        "data:",
-        "blob:", 
-        "https://www.google.com",
-        "https://www.google.co.uk",
-        "https://googleads.g.doubleclick.net",
-        "https://www.google-analytics.com",
-        "https://maps.gstatic.com", 
-        "https://maps.googleapis.com",
-        "https://web.squarecdn.com",
-        "https://squareup.com"
-      ],
-      connectSrc: [
-        "'self'",
-        "https://www.google-analytics.com",
-        "https://stats.g.doubleclick.net",
-        "https://googleads.g.doubleclick.net",
-        "https://maps.googleapis.com",
-        "https://web.squarecdn.com",
-        "https://squareup.com",
-        "https://*.squareup.com"
-      ],
-      // ✅ THIS WAS MISSING AND CAUSED THE ERROR:
-      frameSrc: [
-        "'self'",
-        "https://web.squarecdn.com",
-        "https://*.squareup.com",
-        "https://www.google.com" 
-      ],
-    },
-  },
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
 }));
 // ==========================================
 // 4. HELPER FUNCTIONS
