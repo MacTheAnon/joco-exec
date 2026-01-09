@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Autocomplete from 'react-google-autocomplete'; // ✅ REQUIRED FOR MAPS
 
 const BookingForm = ({ onSubmit }) => {
   // --- STATE MANAGEMENT ---
@@ -12,14 +13,13 @@ const BookingForm = ({ onSubmit }) => {
     dropoff: '',
     meetAndGreet: false,
     passengers: '1',
-    // MUST match the keys in your server.js PRICING_CONFIG
     vehicleType: 'Luxury Sedan' 
   });
 
   const [checking, setChecking] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 600);
 
-  // Handle Window Resize for Responsive Layout
+  // Handle Window Resize
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 600);
     window.addEventListener('resize', handleResize);
@@ -27,7 +27,6 @@ const BookingForm = ({ onSubmit }) => {
   }, []);
 
   // --- HANDLERS ---
-
   const handleChange = (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     setFormData({ ...formData, [e.target.name]: value });
@@ -36,7 +35,6 @@ const BookingForm = ({ onSubmit }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Basic Validation
     if (!formData.date || !formData.time || !formData.pickup || !formData.name) {
       alert("Please fill in all required details.");
       return;
@@ -62,8 +60,7 @@ const BookingForm = ({ onSubmit }) => {
         return;
       }
 
-      // 2. GET OFFICIAL QUOTE (Dynamic Pricing)
-      // We send the addresses to the server to do the "Whichever is higher" math
+      // 2. GET OFFICIAL QUOTE
       const quoteResponse = await fetch(`${apiUrl}/api/get-quote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -80,9 +77,7 @@ const BookingForm = ({ onSubmit }) => {
         throw new Error(quoteData.error);
       }
 
-      // 3. SUCCESS - Pass data to parent
-      // Note: quoteData.quote is in Dollars (e.g., 85.00). 
-      // We multiply by 100 because your system uses Cents for payment logic.
+      // 3. SUCCESS
       onSubmit({ 
           ...formData, 
           amount: Math.round(quoteData.quote * 100), 
@@ -91,7 +86,7 @@ const BookingForm = ({ onSubmit }) => {
 
     } catch (err) {
       console.error(err);
-      alert("Error fetching quote. Please check your network connection.");
+      alert("Error fetching quote. Please check your network connection or address validity.");
     } finally {
       setChecking(false);
     }
@@ -100,7 +95,6 @@ const BookingForm = ({ onSubmit }) => {
   // --- RENDER ---
   return (
     <div style={formCardStyle}>
-      {/* Header */}
       <div style={{ textAlign: 'center', marginBottom: '25px' }}>
         <h2 style={headerTitleStyle}>Request a Ride</h2>
         <p style={headerSubtitleStyle}>Professional Chauffeur Service</p>
@@ -121,7 +115,7 @@ const BookingForm = ({ onSubmit }) => {
           />
         </div>
         
-        {/* Contact Info Grid */}
+        {/* Contact Info */}
         <div style={isMobile ? columnGridStyle : rowGridStyle}>
            <div style={{ flex: 1 }}>
              <label style={labelStyle}>Email Address</label>
@@ -147,23 +141,22 @@ const BookingForm = ({ onSubmit }) => {
            </div>
         </div>
 
-        {/* VEHICLE SELECTION (Updated to match Server Config) */}
+        {/* ✅ UPDATED VEHICLE SELECTION: Sedan, SUV, and Night Out */}
         <div style={inputGroupStyle}>
-            <label style={labelStyle}>Select Vehicle Class</label>
+            <label style={labelStyle}>Select Service / Vehicle</label>
             <select 
                 name="vehicleType" 
                 style={inputStyle} 
                 onChange={handleChange} 
                 value={formData.vehicleType}
             >
-                <option value="Luxury Sedan">Luxury Sedan (Base $85 or $3/mile)</option>
-                <option value="Luxury SUV">Luxury SUV (Base $115 or $4.50/mile)</option>
-                <option value="Sprinter">Mercedes Sprinter (Base $150 or $6/mile)</option>
-                <option value="Executive Bus">Executive Bus (Base $250 or $10/mile)</option>
+                <option value="Luxury Sedan">Luxury Lexus Sedan (Base $85 or $3/mile)</option>
+                <option value="Luxury SUV">Executive SUV (Base $95 or $4.50/mile)</option>
+                <option value="Night Out">Night Out (Starts at $150)</option>
             </select>
         </div>
 
-        {/* Date & Time Grid */}
+        {/* Date & Time */}
         <div style={isMobile ? columnGridStyle : rowGridStyle}>
           <div style={{ flex: 1 }}>
             <label style={labelStyle}>Date</label>
@@ -187,33 +180,47 @@ const BookingForm = ({ onSubmit }) => {
           </div>
         </div>
 
-        {/* Pickup Location */}
+        {/* ✅ PICKUP: GOOGLE AUTOCOMPLETE (Required for Mileage) */}
         <div style={inputGroupStyle}>
             <label style={labelStyle}>Pickup Location</label>
-            <input 
-                type="text" 
-                name="pickup" 
-                style={inputStyle} 
-                onChange={handleChange} 
-                placeholder="Address, Airport, or Hotel" 
-                required 
+            <Autocomplete
+                apiKey={process.env.REACT_APP_GOOGLE_MAPS_KEY}
+                onPlaceSelected={(place) => {
+                    setFormData(prev => ({ ...prev, pickup: place.formatted_address || place.name }));
+                }}
+                options={{
+                    types: ['geocode', 'establishment'],
+                    componentRestrictions: { country: "us" },
+                }}
+                style={inputStyle}
+                placeholder="Start typing address..."
+                required
+                defaultValue={formData.pickup}
+                onChange={(e) => setFormData({...formData, pickup: e.target.value})}
             />
         </div>
 
-        {/* Dropoff Location */}
+        {/* ✅ DROPOFF: GOOGLE AUTOCOMPLETE (Required for Mileage) */}
         <div style={inputGroupStyle}>
             <label style={labelStyle}>Dropoff Location</label>
-            <input 
-                type="text" 
-                name="dropoff" 
-                style={inputStyle} 
-                onChange={handleChange} 
-                placeholder="Destination Address" 
-                required 
+            <Autocomplete
+                apiKey={process.env.REACT_APP_GOOGLE_MAPS_KEY}
+                onPlaceSelected={(place) => {
+                    setFormData(prev => ({ ...prev, dropoff: place.formatted_address || place.name }));
+                }}
+                options={{
+                    types: ['geocode', 'establishment'],
+                    componentRestrictions: { country: "us" },
+                }}
+                style={inputStyle}
+                placeholder="Start typing destination..."
+                required
+                defaultValue={formData.dropoff}
+                onChange={(e) => setFormData({...formData, dropoff: e.target.value})}
             />
         </div>
 
-        {/* Meet & Greet Checkbox */}
+        {/* Meet & Greet */}
         <div style={checkboxContainerStyle}>
           <label style={checkboxLabelStyle}>
             <input 
@@ -227,7 +234,6 @@ const BookingForm = ({ onSubmit }) => {
           </label>
         </div>
 
-        {/* Submit Button */}
         <button 
             type="submit" 
             style={checking ? disabledButtonStyle : activeButtonStyle} 
@@ -238,7 +244,6 @@ const BookingForm = ({ onSubmit }) => {
 
       </form>
       
-      {/* Trust Badge Footer */}
       <div style={footerContainerStyle}>
          <h4 style={footerTitleStyle}>Executive Reliability</h4>
          <p style={footerTextStyle}>
@@ -249,7 +254,7 @@ const BookingForm = ({ onSubmit }) => {
   );
 };
 
-// --- STYLES (Kept identical to preserve your look) ---
+// --- STYLES ---
 const formCardStyle = { background: '#111', border: '1px solid #C5A059', padding: '35px', borderRadius: '12px', maxWidth: '550px', width: '100%', margin: '0 auto', color: '#fff', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', boxSizing: 'border-box'};
 const headerTitleStyle = { color: '#C5A059', marginTop: 0, fontSize: '1.8rem', fontFamily: '"Playfair Display", serif', marginBottom: '5px'};
 const headerSubtitleStyle = { color: '#888', fontSize: '0.9rem', margin: 0};

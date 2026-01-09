@@ -32,9 +32,9 @@ const USERS_FILE = path.join(__dirname, 'users.json');
 // This handles ALL vehicle types in one config
 const PRICING_CONFIG = {
     'Luxury Sedan':  { baseRate: 85,  perMileRate: 3.00 },
-    'Luxury SUV':    { baseRate: 115, perMileRate: 4.50 },
-    'Sprinter':      { baseRate: 150, perMileRate: 6.00 },
-    'Executive Bus': { baseRate: 250, perMileRate: 10.00 }
+    'Luxury SUV':    { baseRate: 95,  perMileRate: 4.50 },
+    // ✅ ADDED BACK: Base $150.00
+    'Night Out':     { baseRate: 150, perMileRate: 4.50 } 
 };
 
 console.log(`🚀 CONFIG: Server targeting ${BASE_URL} on PORT ${PORT}`);
