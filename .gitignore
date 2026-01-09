@@ -1,6 +1,5 @@
 node_modules/
 .env
-build/
 bookings.json
 users.json
 .DS_Store
