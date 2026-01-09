@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import BookingForm from '../components/BookingForm';
 import SquarePayment from '../components/SquarePayment'; 
+import { trackConversion } from '../googleAds'; // Import your helper
 
 const Booking = () => {
   const [step, setStep] = useState(1); // 1 = Form, 2 = Payment, 3 = Success
@@ -10,15 +11,37 @@ const Booking = () => {
     window.scrollTo(0, 0);
   }, [step]);
 
+  // ✅ GOOGLE ADS TRACKING
+  useEffect(() => {
+    // Only run this if we are on Step 3 (Success) and have payment details
+    if (step === 3 && bookingDetails && bookingDetails.paymentId) {
+        
+        console.log("📢 Sending Conversion to Google Ads...");
+        
+        // ✅ YOUR SPECIFIC LABEL
+        const myConversionLabel = "CfIrCMSB_d8bEIHVhpoD"; 
+
+        trackConversion(
+            myConversionLabel, 
+            bookingDetails.amount / 100, // Converts cents to dollars (e.g. 8500 -> 85.00)
+            bookingDetails.paymentId     // Unique ID from Square so Google doesn't count duplicates
+        );
+    }
+  }, [step, bookingDetails]);
+
   // Handler when user submits the details form
-  // Now receives 'data' which includes the OFFICIAL price from the server
   const handleFormSubmit = (data) => {
     setBookingDetails(data);
     setStep(2); // Move to Payment
   };
 
   // Handler when payment is successful
-  const handlePaymentSuccess = () => {
+  const handlePaymentSuccess = (paymentResult) => {
+    // Save the paymentId so we can send it to Google
+    setBookingDetails(prev => ({ 
+        ...prev, 
+        paymentId: paymentResult.paymentId 
+    }));
     setStep(3); // Move to Success
   };
 
@@ -52,7 +75,6 @@ const Booking = () => {
               </button>
             </div>
             
-            {/* The Payment Component we built earlier */}
             <SquarePayment bookingDetails={bookingDetails} onSuccess={handlePaymentSuccess} />
           </>
         )}
