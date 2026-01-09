@@ -17,8 +17,6 @@
     "twilio": "^5.11.1"
   },
   "scripts": {
-    "start": "node server.js",
-    "build": "cd client && npm install && npm run build && rm -rf ../build && mv build ../",
-    "build-windows": "cd client && npm install && npm run build && rmdir /s /q ..\\build && move build ..\\"
-  }
+  "start": "node server.js",
+  "build": "cd client && npm install && npm run build"
 }
