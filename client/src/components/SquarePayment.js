@@ -31,8 +31,8 @@ const SquarePayment = ({ onSuccess, bookingDetails }) => {
       </div>
 
       <PaymentForm
-        // SANDBOX APP ID
-        applicationId="sandbox-sq0idb-7q_dOjTtu2YL5b5KSwwu9A"
+        // ⚠️ IMPORTANT: Switch this to your Production App ID when going live
+        applicationId="sq0idp-WEHQaoQdRnOWl_c8-GfXBg" 
         locationId="LD7WCY7X0HQT4"
         cardTokenizeResponseReceived={async (token) => {
           setIsSubmitting(true);
@@ -45,13 +45,17 @@ const SquarePayment = ({ onSuccess, bookingDetails }) => {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 
                 sourceId: token.token,
-                amount: bookingDetails.amount, // Send Base Amount (Server adds Meet & Greet fee)
+                // We send these details so the backend can verify the dynamic price
+                vehicleType: bookingDetails.vehicleType, 
+                pickup: bookingDetails.pickup, 
+                dropoff: bookingDetails.dropoff,
                 bookingDetails: bookingDetails 
               }),
             });
 
             if (response.ok) {
-              onSuccess(bookingDetails); 
+              const data = await response.json();
+              onSuccess(data); // Pass server response (paymentId) back to parent
             } else {
               const errorData = await response.json();
               alert(`Payment Error: ${errorData.error || 'Declined'}`);

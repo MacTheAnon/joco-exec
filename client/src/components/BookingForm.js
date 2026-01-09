@@ -12,7 +12,8 @@ const BookingForm = ({ onSubmit }) => {
     dropoff: '',
     meetAndGreet: false,
     passengers: '1',
-    serviceType: 'Sedan' // Default Service
+    // MUST match the keys in your server.js PRICING_CONFIG
+    vehicleType: 'Luxury Sedan' 
   });
 
   const [checking, setChecking] = useState(false);
@@ -44,44 +45,53 @@ const BookingForm = ({ onSubmit }) => {
     setChecking(true);
 
     try {
-      // --- PRICING LOGIC ---
-      let calculatedAmount = 8500; // Default: Sedan ($85.00)
+      const apiUrl = process.env.REACT_APP_API_URL || 'https://www.jocoexec.com';
 
-      if (formData.serviceType === 'SUV') {
-        calculatedAmount = 9500; // Executive SUV ($95.00)
-      } else if (formData.serviceType === 'NightOut') {
-        calculatedAmount = 15000; // Night Out ($150.00 min)
-      } else if (formData.serviceType === 'Corporate') {
-        calculatedAmount = 15000; // Corporate Event ($150.00 min)
-      }
-
-      // WORLD CUP 2026 OVERRIDE
-      // If date is June 2026, set flat rate to $250.00
-      const bookingDate = new Date(formData.date);
-      if (bookingDate.getFullYear() === 2026 && bookingDate.getMonth() === 5) {
-        calculatedAmount = 25000; 
-      }
-
-      // --- CHECK AVAILABILITY (PRODUCTION URL) ---
-      const apiUrl = 'https://www.jocoexec.com';
-      
-      const response = await fetch(`${apiUrl}/api/check-availability`, {
+      // 1. CHECK AVAILABILITY
+      const availResponse = await fetch(`${apiUrl}/api/check-availability`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: formData.date, time: formData.time }),
       });
       
-      const data = await response.json();
+      const availData = await availResponse.json();
 
-      if (data.available) {
-        // Pass the calculated amount and form data back to the parent component
-        onSubmit({ ...formData, amount: calculatedAmount }); 
-      } else {
+      if (!availData.available) {
         alert("❌ Sorry, that time slot is already booked. Please select a different time.");
+        setChecking(false);
+        return;
       }
+
+      // 2. GET OFFICIAL QUOTE (Dynamic Pricing)
+      // We send the addresses to the server to do the "Whichever is higher" math
+      const quoteResponse = await fetch(`${apiUrl}/api/get-quote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            vehicleType: formData.vehicleType,
+            pickup: formData.pickup,
+            dropoff: formData.dropoff
+        }),
+      });
+
+      const quoteData = await quoteResponse.json();
+
+      if (quoteData.error) {
+        throw new Error(quoteData.error);
+      }
+
+      // 3. SUCCESS - Pass data to parent
+      // Note: quoteData.quote is in Dollars (e.g., 85.00). 
+      // We multiply by 100 because your system uses Cents for payment logic.
+      onSubmit({ 
+          ...formData, 
+          amount: Math.round(quoteData.quote * 100), 
+          distance: quoteData.distance 
+      }); 
+
     } catch (err) {
       console.error(err);
-      alert("Server Connection Error. Please ensure you are connected to the network.");
+      alert("Error fetching quote. Please check your network connection.");
     } finally {
       setChecking(false);
     }
@@ -116,40 +126,40 @@ const BookingForm = ({ onSubmit }) => {
            <div style={{ flex: 1 }}>
              <label style={labelStyle}>Email Address</label>
              <input 
-                type="email" 
-                name="email" 
-                style={inputStyle} 
-                onChange={handleChange} 
-                placeholder="email@example.com" 
-                required 
+               type="email" 
+               name="email" 
+               style={inputStyle} 
+               onChange={handleChange} 
+               placeholder="email@example.com" 
+               required 
              />
            </div>
            <div style={{ flex: 1 }}>
              <label style={labelStyle}>Phone Number</label>
              <input 
-                type="tel" 
-                name="phone" 
-                style={inputStyle} 
-                onChange={handleChange} 
-                placeholder="(913) 000-0000" 
-                required 
+               type="tel" 
+               name="phone" 
+               style={inputStyle} 
+               onChange={handleChange} 
+               placeholder="(913) 000-0000" 
+               required 
              />
            </div>
         </div>
 
-        {/* SERVICE SELECTION DROPDOWN */}
+        {/* VEHICLE SELECTION (Updated to match Server Config) */}
         <div style={inputGroupStyle}>
-            <label style={labelStyle}>Select Service Type</label>
+            <label style={labelStyle}>Select Vehicle Class</label>
             <select 
-                name="serviceType" 
+                name="vehicleType" 
                 style={inputStyle} 
                 onChange={handleChange} 
-                value={formData.serviceType}
+                value={formData.vehicleType}
             >
-                <option value="Sedan">Luxury Sedan ($85.00)</option>
-                <option value="SUV">Executive SUV ($95.00)</option>
-                <option value="NightOut">Night Out / Hourly ($150.00)</option>
-                <option value="Corporate">Corporate Event Hosting ($150.00)</option>
+                <option value="Luxury Sedan">Luxury Sedan (Base $85 or $3/mile)</option>
+                <option value="Luxury SUV">Luxury SUV (Base $115 or $4.50/mile)</option>
+                <option value="Sprinter">Mercedes Sprinter (Base $150 or $6/mile)</option>
+                <option value="Executive Bus">Executive Bus (Base $250 or $10/mile)</option>
             </select>
         </div>
 
@@ -223,7 +233,7 @@ const BookingForm = ({ onSubmit }) => {
             style={checking ? disabledButtonStyle : activeButtonStyle} 
             disabled={checking}
         >
-          {checking ? "CHECKING AVAILABILITY..." : "PROCEED TO DEPOSIT"}
+          {checking ? "CALCULATING QUOTE..." : "GET QUOTE & RESERVE"}
         </button>
 
       </form>
@@ -232,150 +242,29 @@ const BookingForm = ({ onSubmit }) => {
       <div style={footerContainerStyle}>
          <h4 style={footerTitleStyle}>Executive Reliability</h4>
          <p style={footerTextStyle}>
-            Real-time flight tracking and chauffeur coordination ensure your vehicle is on-site before you land.
+           Real-time flight tracking and chauffeur coordination ensure your vehicle is on-site before you land.
          </p>
       </div>
     </div>
   );
 };
 
-// --- PROFESSIONAL STYLES ---
-
-const formCardStyle = {
-  background: '#111', 
-  border: '1px solid #C5A059', 
-  padding: '35px', 
-  borderRadius: '12px', 
-  maxWidth: '550px', 
-  width: '100%',
-  margin: '0 auto', 
-  color: '#fff',
-  boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
-  boxSizing: 'border-box'
-};
-
-const headerTitleStyle = {
-    color: '#C5A059', 
-    marginTop: 0, 
-    fontSize: '1.8rem',
-    fontFamily: '"Playfair Display", serif',
-    marginBottom: '5px'
-};
-
-const headerSubtitleStyle = {
-    color: '#888',
-    fontSize: '0.9rem',
-    margin: 0
-};
-
-const inputGroupStyle = {
-    marginBottom: '20px'
-};
-
-const rowGridStyle = {
-    display: 'flex', 
-    flexDirection: 'row', 
-    gap: '15px',
-    marginBottom: '20px'
-};
-
-const columnGridStyle = {
-    display: 'flex', 
-    flexDirection: 'column', 
-    gap: '20px',
-    marginBottom: '20px'
-};
-
-const labelStyle = { 
-  display: 'block', 
-  marginBottom: '8px', 
-  color: '#C5A059', 
-  fontWeight: 'bold', 
-  fontSize: '0.85rem',
-  textTransform: 'uppercase',
-  letterSpacing: '0.5px'
-};
-
-const inputStyle = { 
-  width: '100%', 
-  padding: '14px', 
-  background: '#000', 
-  border: '1px solid #333', 
-  color: '#fff', 
-  borderRadius: '6px', 
-  boxSizing: 'border-box',
-  fontSize: '16px', // Prevents iOS zoom
-  fontFamily: 'inherit',
-  outline: 'none',
-  transition: 'border-color 0.2s'
-};
-
-const checkboxContainerStyle = { 
-  marginBottom: '25px', 
-  padding: '15px', 
-  background: '#000', 
-  borderRadius: '6px', 
-  border: '1px solid #333' 
-};
-
-const checkboxLabelStyle = { 
-  color: '#C5A059', 
-  cursor: 'pointer', 
-  display: 'flex', 
-  alignItems: 'center', 
-  gap: '12px', 
-  fontSize: '1rem' 
-};
-
-const checkboxStyle = { 
-  width: '20px', 
-  height: '20px',
-  accentColor: '#C5A059',
-  cursor: 'pointer'
-};
-
-const activeButtonStyle = { 
-  width: '100%', 
-  padding: '18px', 
-  background: '#C5A059', 
-  color: '#000', 
-  border: 'none', 
-  fontWeight: 'bold', 
-  fontSize: '1rem', 
-  cursor: 'pointer', 
-  borderRadius: '6px', 
-  textTransform: 'uppercase',
-  letterSpacing: '1px',
-  transition: 'background 0.3s ease'
-};
-
-const disabledButtonStyle = {
-  ...activeButtonStyle,
-  background: '#555',
-  color: '#888',
-  cursor: 'not-allowed'
-};
-
-const footerContainerStyle = { 
-  marginTop: '30px', 
-  borderTop: '1px solid #222', 
-  paddingTop: '20px', 
-  textAlign: 'center' 
-};
-
-const footerTitleStyle = { 
-  color: '#C5A059', 
-  margin: '0 0 8px 0', 
-  textTransform: 'uppercase', 
-  letterSpacing: '1px',
-  fontSize: '1rem'
-};
-
-const footerTextStyle = { 
-  fontSize: '0.9rem', 
-  color: '#888', 
-  margin: 0, 
-  lineHeight: '1.5' 
-};
+// --- STYLES (Kept identical to preserve your look) ---
+const formCardStyle = { background: '#111', border: '1px solid #C5A059', padding: '35px', borderRadius: '12px', maxWidth: '550px', width: '100%', margin: '0 auto', color: '#fff', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', boxSizing: 'border-box'};
+const headerTitleStyle = { color: '#C5A059', marginTop: 0, fontSize: '1.8rem', fontFamily: '"Playfair Display", serif', marginBottom: '5px'};
+const headerSubtitleStyle = { color: '#888', fontSize: '0.9rem', margin: 0};
+const inputGroupStyle = { marginBottom: '20px'};
+const rowGridStyle = { display: 'flex', flexDirection: 'row', gap: '15px', marginBottom: '20px'};
+const columnGridStyle = { display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '20px'};
+const labelStyle = { display: 'block', marginBottom: '8px', color: '#C5A059', fontWeight: 'bold', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px'};
+const inputStyle = { width: '100%', padding: '14px', background: '#000', border: '1px solid #333', color: '#fff', borderRadius: '6px', boxSizing: 'border-box', fontSize: '16px', fontFamily: 'inherit', outline: 'none', transition: 'border-color 0.2s'};
+const checkboxContainerStyle = { marginBottom: '25px', padding: '15px', background: '#000', borderRadius: '6px', border: '1px solid #333' };
+const checkboxLabelStyle = { color: '#C5A059', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1rem' };
+const checkboxStyle = { width: '20px', height: '20px', accentColor: '#C5A059', cursor: 'pointer'};
+const activeButtonStyle = { width: '100%', padding: '18px', background: '#C5A059', color: '#000', border: 'none', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '1px', transition: 'background 0.3s ease'};
+const disabledButtonStyle = { ...activeButtonStyle, background: '#555', color: '#888', cursor: 'not-allowed'};
+const footerContainerStyle = { marginTop: '30px', borderTop: '1px solid #222', paddingTop: '20px', textAlign: 'center' };
+const footerTitleStyle = { color: '#C5A059', margin: '0 0 8px 0', textTransform: 'uppercase', letterSpacing: '1px', fontSize: '1rem'};
+const footerTextStyle = { fontSize: '0.9rem', color: '#888', margin: 0, lineHeight: '1.5' };
 
 export default BookingForm;

@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-ro
 
 // Import Pages
 import Home from './pages/Home';
-import Booking from './pages/Booking'; // Ensure this file exists now!
+import Booking from './pages/Booking'; // ✅ Your new Booking Page
 import Login from './pages/Login';
 import Register from './pages/Register'; 
 import Dashboard from './pages/Dashboard';
@@ -19,12 +19,20 @@ import Footer from './components/Footer';
 function App() {
   const [user, setUser] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  
+  // FIX: Track window size in state so the menu updates instantly on resize/rotate
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
+
+    // Add Resize Listener
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const handleLogout = () => {
@@ -57,11 +65,11 @@ function App() {
             </div>
           </Link>
 
-          {/* Hamburger Icon */}
+          {/* Hamburger Icon (Only shows if isMobile is true) */}
           <button 
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             style={{
-              display: window.innerWidth < 768 ? 'block' : 'none',
+              display: isMobile ? 'block' : 'none', // ✅ Uses state variable
               background: 'none',
               border: 'none',
               color: '#C5A059',
@@ -74,17 +82,17 @@ function App() {
           
           {/* Navigation Links */}
           <div style={{
-            display: (isMenuOpen || window.innerWidth > 768) ? 'flex' : 'none',
-            flexDirection: window.innerWidth < 768 ? 'column' : 'row',
-            position: window.innerWidth < 768 ? 'absolute' : 'static',
+            display: (isMenuOpen || !isMobile) ? 'flex' : 'none', // ✅ Uses state variable
+            flexDirection: isMobile ? 'column' : 'row',
+            position: isMobile ? 'absolute' : 'static',
             top: '65px',
             left: 0,
-            width: window.innerWidth < 768 ? '100%' : 'auto',
+            width: isMobile ? '100%' : 'auto',
             background: '#000',
             alignItems: 'center',
             gap: '15px',
-            padding: window.innerWidth < 768 ? '20px 0' : '0',
-            borderBottom: window.innerWidth < 768 ? '1px solid #C5A059' : 'none'
+            padding: isMobile ? '20px 0' : '0',
+            borderBottom: isMobile ? '1px solid #C5A059' : 'none'
           }}>
             <Link to="/" style={navLinkStyle} onClick={closeMenu}>Home</Link>
             
@@ -116,6 +124,7 @@ function App() {
             <Route path="/terms" element={<Terms />} />
             <Route path="/refunds" element={<Refunds />} />
 
+            {/* Protected Routes */}
             <Route path="/admin" element={user && user.role === 'admin' ? <Admin /> : <Navigate to="/login" />} />
             <Route path="/dashboard" element={user ? <Dashboard /> : <Navigate to="/login" />} />
             <Route path="/driver-dashboard" element={user && user.role === 'driver' ? <DriverDashboard /> : <Navigate to="/login" />} />
@@ -135,4 +144,3 @@ const logoutBtnStyle = { background: 'transparent', color: '#fff', border: '1px 
 const bookBtnStyle = { background: '#C5A059', color: '#000', padding: '10px 20px', borderRadius: '4px', textDecoration: 'none', fontWeight: 'bold' };
 
 export default App;
-

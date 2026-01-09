@@ -11,6 +11,7 @@ const Booking = () => {
   }, [step]);
 
   // Handler when user submits the details form
+  // Now receives 'data' which includes the OFFICIAL price from the server
   const handleFormSubmit = (data) => {
     setBookingDetails(data);
     setStep(2); // Move to Payment
@@ -30,7 +31,7 @@ const Booking = () => {
           <>
             <div style={{ textAlign: 'center', marginBottom: '30px' }}>
               <h1 style={{ color: '#fff', fontFamily: '"Playfair Display", serif' }}>Reserve Your Ride</h1>
-              <p style={{ color: '#888' }}>Enter your trip details below to check availability.</p>
+              <p style={{ color: '#888' }}>Enter your trip details below to get an instant quote.</p>
             </div>
             <BookingForm onSubmit={handleFormSubmit} />
           </>
@@ -41,13 +42,17 @@ const Booking = () => {
           <>
             <div style={{ textAlign: 'center', marginBottom: '30px' }}>
               <h1 style={{ color: '#fff', fontFamily: '"Playfair Display", serif' }}>Secure Deposit</h1>
+              <p style={{ color: '#888' }}>Please review your quote before depositing.</p>
+              
               <button 
                 onClick={() => setStep(1)} 
-                style={{ background: 'none', border: 'none', color: '#C5A059', cursor: 'pointer', textDecoration: 'underline' }}
+                style={{ background: 'none', border: 'none', color: '#C5A059', cursor: 'pointer', textDecoration: 'underline', marginTop: '10px' }}
               >
                 &larr; Go Back to Edit Details
               </button>
             </div>
+            
+            {/* The Payment Component we built earlier */}
             <SquarePayment bookingDetails={bookingDetails} onSuccess={handlePaymentSuccess} />
           </>
         )}

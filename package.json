@@ -4,10 +4,12 @@
   "main": "server.js",
   "dependencies": {
     "@googlemaps/google-maps-services-js": "^3.4.2",
+    "axios": "^1.13.2",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "node-cron": "^4.2.1",
     "nodemailer": "^7.0.12",
