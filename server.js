@@ -54,62 +54,63 @@ const transporter = nodemailer.createTransport({
 // ==========================================
 // 3. MIDDLEWARE SETUP (✅ FIXED SECURITY RULES)
 // ==========================================
-
-// We use Helmet but customize the Content Security Policy (CSP)
-// to allow Google Ads, Square, and Google Maps to load.
 app.use(helmet({
   contentSecurityPolicy: {
+    useDefaults: false, // distinct from the previous code, ensures we don't inherit strict defaults
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: [
-        "'self'", 
-        "'unsafe-inline'", // Allows the Google Tag code in index.html
+        "'self'",
+        "'unsafe-inline'", 
         "https://www.googletagmanager.com",
         "https://web.squarecdn.com",
+        "https://squareup.com",
         "https://maps.googleapis.com"
       ],
       styleSrc: [
-        "'self'", 
-        "'unsafe-inline'", 
-        "https://fonts.googleapis.com"
+        "'self'",
+        "'unsafe-inline'",
+        "https://fonts.googleapis.com",
+        "https://web.squarecdn.com"
       ],
       fontSrc: [
-        "'self'", 
-        "https://fonts.gstatic.com"
+        "'self'",
+        "https://fonts.gstatic.com",
+        "https://web.squarecdn.com"
       ],
       imgSrc: [
-        "'self'", 
-        "data:", 
-        "https://www.google.com", 
-        "https://www.google.co.uk", 
+        "'self'",
+        "data:",
+        "blob:", 
+        "https://www.google.com",
+        "https://www.google.co.uk",
         "https://googleads.g.doubleclick.net",
-        "https://www.google-analytics.com"
+        "https://www.google-analytics.com",
+        "https://maps.gstatic.com", 
+        "https://maps.googleapis.com",
+        "https://web.squarecdn.com",
+        "https://squareup.com"
       ],
       connectSrc: [
-        "'self'", 
-        "https://www.google-analytics.com", 
-        "https://stats.g.doubleclick.net", 
+        "'self'",
+        "https://www.google-analytics.com",
+        "https://stats.g.doubleclick.net",
         "https://googleads.g.doubleclick.net",
-        "https://maps.googleapis.com"
+        "https://maps.googleapis.com",
+        "https://web.squarecdn.com",
+        "https://squareup.com",
+        "https://*.squareup.com"
+      ],
+      // ✅ THIS WAS MISSING AND CAUSED THE ERROR:
+      frameSrc: [
+        "'self'",
+        "https://web.squarecdn.com",
+        "https://*.squareup.com",
+        "https://www.google.com" 
       ],
     },
   },
 }));
-
-app.use(cors({
-    origin: process.env.NODE_ENV === 'production' ? 'https://www.jocoexec.com' : '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
-app.use(express.json());
-
-// Request Logging
-app.use((req, res, next) => {
-    console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.url}`);
-    next();
-});
-
 // ==========================================
 // 4. HELPER FUNCTIONS
 // ==========================================
