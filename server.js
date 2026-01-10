@@ -78,18 +78,23 @@ const saveUser = (u) => {
 
 // JWT Token for Frontend MapKit JS
 // JWT Token for Frontend MapKit JS
+// ==========================================
+// 3. APPLE MAPS INTEGRATION
+// ==========================================
+
 app.get('/api/maps/token', (req, res) => {
     try {
-        // FIX: Dynamically grab the origin so it works on Localhost, Railway, AND Production
-        const requestOrigin = req.headers.origin || "https://www.jocoexec.com";
+        // FIX: Remove the hardcoded fallback and let it be dynamic
+        const requestOrigin = req.headers.origin; 
 
         const payload = {
             iss: process.env.APPLE_MAPS_TEAM_ID || "827CZWJ6A7", 
             iat: Math.floor(Date.now() / 1000),
             exp: Math.floor(Date.now() / 1000) + (1200),
-            origin: requestOrigin // <--- This allows the token to work on the current domain
+            origin: requestOrigin // This MUST match the domain in your browser
         };
         
+        // ... rest of your code
         const privateKey = (process.env.APPLE_MAPS_PRIVATE_KEY || "").replace(/\\n/g, '\n');
 
         const token = jwt.sign(payload, privateKey, {
