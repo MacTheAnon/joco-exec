@@ -33,5 +33,9 @@
       "last 1 chrome version",
       "last 1 firefox version"
     ]
+  },
+  "overrides": {
+    "react": "$react",
+    "react-dom": "$react-dom"
   }
 }
