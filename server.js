@@ -277,23 +277,26 @@ app.delete('/api/admin/bookings/:id', (req, res) => {
     res.json({ success: true });
 });
 
-// ==========================================
-// 5. PRODUCTION STATIC SERVING
-// ==========================================
-// ==========================================
-// 5. PRODUCTION STATIC SERVING
-// ==========================================
 const clientBuildPath = path.join(__dirname, 'client', 'build');
 const rootBuildPath = path.join(__dirname, 'build');
 
-app.get('/:splat*', (req, res) => {
-    const buildPath = path.join(__dirname, 'client', 'build');
-    const rootBuildPath = path.join(__dirname, 'build');
-    
-    if (fs.existsSync(buildPath)) {
-        res.sendFile(path.join(buildPath, 'index.html'));
-    } else {
-        res.sendFile(path.join(rootBuildPath, 'index.html'));
-    }
+// Serve static files from the React app
+if (fs.existsSync(clientBuildPath)) {
+    app.use(express.static(clientBuildPath));
+} else if (fs.existsSync(rootBuildPath)) {
+    app.use(express.static(rootBuildPath));
+}
+
+// The "Catch-All" route to handle React Router
+// We use 'index.html' for any request that isn't an API route
+app.get('*', (req, res, next) => {
+    // If the request starts with /api, don't serve index.html (let it 404 or handle logic)
+    if (req.url.startsWith('/api')) return next();
+
+    const targetPath = fs.existsSync(clientBuildPath) 
+        ? path.join(clientBuildPath, 'index.html') 
+        : path.join(rootBuildPath, 'index.html');
+
+    res.sendFile(targetPath);
 });
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 JOCO EXEC running on port ${PORT}`));
