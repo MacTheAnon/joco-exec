@@ -73,10 +73,11 @@ const saveUser = (u) => {
 };
 
 // ==========================================
-// 3. APPLE MAPS INTEGRATION (FINAL FIX)
+// 3. APPLE MAPS INTEGRATION (SAFE STATIC TOKENS)
 // ==========================================
 
-// Valid tokens from your CSV
+// These are the valid, pre-approved tokens from your CSV.
+// We use these because your Private Key configuration might be buggy.
 const MAPS_TOKENS = {
     // Live Production
     "www.jocoexec.com": "eyJraWQiOiI2VTgySkZDNlhUIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg0NjQ4LCJvcmlnaW4iOiJ3d3cuam9jb2V4ZWMuY29tIn0.-gPvMZbjh6DKKeTbEZP0QRgaEkxfA1X1jcO3ZZPenAzhhOd9t_gsBzaOxnGGTUaPQkl-2XbxoNpKOva-B8ZRCw",
@@ -85,28 +86,30 @@ const MAPS_TOKENS = {
     // Railway Deployment
     "joco-exec.up.railway.app": "eyJraWQiOiI2Njc5N0hUNlQ0IiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg0NjQ4LCJvcmlnaW4iOiJqb2NvLWV4ZWMudXAucmFpbHdheS5hcHAifQ.-MpV0iYJQyMKN5NmIB1JFJj6eQcoE0B114XN1dK11jcISly8JluOfKvJ98ia1vToRhvhmhj3SPhzJ7Z_XUTb9g",
     
-    // Wildcard Fallback (Use for anything else)
+    // Wildcard Fallback (*.jocoexec.com)
     "default": "eyJraWQiOiJTVDZIRzI5SDJBIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg2NTA3LCJvcmlnaW4iOiIqLmpvY29leGVjLmNvbSJ9.in54tp2O2ZteVBOVkY2jUExdZ4o691DKx_UsMTlRU5XVeZOg8br4XCMDYsF_NrK8le2elwOGSHTh6dnEBJl2_A"
 };
 
 // Route: Frontend Token Request
 app.get('/api/maps/token', (req, res) => {
     try {
-        let origin = req.headers.origin || "";
+        // FIX: If 'Origin' is missing (which happens on Railway internal requests), check 'Host'
+        let requestDomain = req.headers.origin || req.headers.host || "";
         
-        // Debug Log: Check what origin is actually coming in
-        console.log(`[DEBUG] Request Origin: ${origin}`);
+        // Clean the domain: Remove "https://", port numbers, and slashes
+        const cleanDomain = requestDomain
+            .replace(/^https?:\/\//, '')
+            .split(':')[0] 
+            .replace(/\/$/, '');
 
-        // Clean the origin (remove https://) to match CSV keys
-        const cleanOrigin = origin.replace(/^https?:\/\//, '').replace(/\/$/, '');
-        console.log(`[DEBUG] Cleaned Origin: ${cleanOrigin}`);
+        console.log(`[DEBUG] Identifying Token for Domain: ${cleanDomain}`);
 
-        // Select Token
-        let token = MAPS_TOKENS[cleanOrigin];
+        // Select the correct pre-approved token
+        let token = MAPS_TOKENS[cleanDomain];
 
-        // If testing on Localhost or unknown domain, use Wildcard
+        // If no specific match found, use the Wildcard token
         if (!token) {
-            console.log(`[WARN] No direct match. Using Wildcard Token.`);
+            console.log(`[WARN] No exact match for ${cleanDomain}. Using Wildcard.`);
             token = MAPS_TOKENS["default"];
         }
 
@@ -118,22 +121,17 @@ app.get('/api/maps/token', (req, res) => {
 });
 
 // Helper: For Server-Side Quote Calculation
-const getAppleMapsServerToken = async () => {
-    // We use the 'www' token for server-side calls
-    return MAPS_TOKENS["www.jocoexec.com"];
-};
-
-// Logic: Charge higher of Mileage total or Base Minimum total
 async function calculateDynamicQuote(vehicleType, pickupCoords, dropoffCoords) {
     const config = PRICING_CONFIG[vehicleType];
     if (!config) throw new Error(`Pricing not configured for: ${vehicleType}`);
 
     try {
-        const serverToken = await getAppleMapsServerToken();
+        // Use the main website token for server-side calculations
+        const serverToken = MAPS_TOKENS["www.jocoexec.com"];
+        
         const url = `https://maps-api.apple.com/v1/etas?origin=${pickupCoords.latitude},${pickupCoords.longitude}&destinations=${dropoffCoords.latitude},${dropoffCoords.longitude}&transportType=Automobile`;
         
-        // FIX: Add 'Origin' header to spoof the website request.
-        // Server-side calls have no origin by default, so Apple rejects MapKit tokens without this.
+        // FIX: Spoof the Origin header so Apple accepts the request from the server
         const response = await axios.get(url, { 
             headers: { 
                 'Authorization': `Bearer ${serverToken}`,

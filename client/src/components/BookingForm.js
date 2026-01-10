@@ -1,13 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Map, Marker } from 'mapkit-react';
 
-const KC_REGION = {
-  centerLatitude: 38.8814,
-  centerLongitude: -94.8191,
-  latitudeDelta: 0.5,
-  longitudeDelta: 0.5
-};
-
 const BookingForm = ({ onSubmit }) => {
   // --- 1. STATE MANAGEMENT ---
   const [formData, setFormData] = useState({
@@ -16,22 +9,27 @@ const BookingForm = ({ onSubmit }) => {
     meetAndGreet: false, passengers: '1', vehicleType: 'Luxury Sedan' 
   });
 
-  // MAP TOKEN STATE (Fixed placement)
-  const [mapToken, setMapToken] = useState("");
+  // DYNAMIC TOKEN STATE
+  const [mapToken, setMapToken] = useState(null);
   const [checking, setChecking] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 600);
   const [pickupResults, setPickupResults] = useState([]);
   const [dropoffResults, setDropoffResults] = useState([]);
 
-  // --- 2. LIFECYCLE: FETCH TOKEN & HANDLE RESIZE ---
+  // --- 2. LIFECYCLE: FETCH TOKEN AUTOMATICALLY ---
   useEffect(() => {
-    // 1. Fetch the secure MapKit token from your backend
+    // This calls your server.js, which detects the domain and returns the correct key
     fetch('/api/maps/token')
       .then(res => res.json())
-      .then(data => setMapToken(data.token))
-      .catch(err => console.error("Could not load MapKit token"));
+      .then(data => {
+        if (data.token) {
+            setMapToken(data.token);
+        } else {
+            console.error("Server returned no token");
+        }
+      })
+      .catch(err => console.error("Map Token Fetch Error:", err));
 
-    // 2. Window Resize Listener
     const handleResize = () => setIsMobile(window.innerWidth < 600);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -39,9 +37,10 @@ const BookingForm = ({ onSubmit }) => {
 
   // --- 3. APPLE MAPS SEARCH LOGIC ---
   const handleAddressSearch = (query, setResults) => {
-    // Ensure MapKit is loaded and query is long enough
+    // Only search if mapkit is loaded
     if (!window.mapkit || query.length < 3) return;
     
+    // Search Region: Kansas City
     const region = new window.mapkit.CoordinateRegion(
       new window.mapkit.Coordinate(38.8814, -94.8191),
       new window.mapkit.CoordinateSpan(0.5, 0.5)
@@ -53,8 +52,7 @@ const BookingForm = ({ onSubmit }) => {
       if (!error) {
         setResults(data.results);
       } else {
-        // If 401 happens here, it's because the domain (localhost) isn't whitelisted
-        console.warn("Autocomplete Error (Check Domain Whitelist):", error);
+        console.warn("Autocomplete Error:", error);
       }
     });
   };
@@ -63,7 +61,7 @@ const BookingForm = ({ onSubmit }) => {
     setFormData({ 
       ...formData, 
       [field]: result.displayLines.join(', '),
-      [`${field}Coords`]: result.coordinate // Required for backend distance API
+      [`${field}Coords`]: result.coordinate 
     });
     setResults([]); 
   };
@@ -73,7 +71,7 @@ const BookingForm = ({ onSubmit }) => {
     setFormData({ ...formData, [e.target.name]: value });
   };
 
-  // --- 4. SUBMISSION & PRICING REQUEST ---
+  // --- 4. SUBMISSION ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.pickupCoords || !formData.dropoffCoords) {
@@ -83,7 +81,6 @@ const BookingForm = ({ onSubmit }) => {
     setChecking(true);
 
     try {
-      // Passes coordinates to the backend pricing engine
       const quoteRes = await fetch('/api/get-quote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -95,7 +92,6 @@ const BookingForm = ({ onSubmit }) => {
       });
       const quoteData = await quoteRes.json();
 
-      // Send processed quote and distance to payment handler
       onSubmit({ 
           ...formData, 
           amount: Math.round(quoteData.quote * 100), 
@@ -115,13 +111,16 @@ const BookingForm = ({ onSubmit }) => {
       <div style={{ textAlign: 'center', marginBottom: '25px' }}>
         <h2 style={headerTitleStyle}>Request a Ride</h2>
         <div style={mapBoxStyle}>
-          {/* Only render Map if we have a token to prevent errors */}
-          {mapToken && (
+          {/* Wait for token before loading map to prevent 401 errors */}
+          {mapToken ? (
             <Map token={mapToken}>
-              <Marker latitude={38.8814} longitude={-94.8191} title="JOCO EXEC" />
+               <Marker latitude={38.8814} longitude={-94.8191} title="JOCO EXEC" />
             </Map>
+          ) : (
+            <div style={{display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'#666'}}>
+                Loading Map...
+            </div>
           )}
-          {!mapToken && <div style={{padding:'20px', color:'#666'}}>Loading Map...</div>}
         </div>
       </div>
       
@@ -213,7 +212,7 @@ const BookingForm = ({ onSubmit }) => {
   );
 };
 
-// --- 6. STYLES (Preserved Original) ---
+// --- STYLES ---
 const formCardStyle = { background: '#111', border: '1px solid #C5A059', padding: '35px', borderRadius: '12px', maxWidth: '550px', width: '100%', margin: '0 auto', color: '#fff', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', boxSizing: 'border-box', position: 'relative'};
 const dropdownStyle = { position: 'absolute', zIndex: 1000, background: '#000', border: '1px solid #C5A059', borderRadius: '4px', width: '100%', marginTop: '0' };
 const dropdownItemStyle = { padding: '12px', cursor: 'pointer', borderBottom: '1px solid #222', fontSize: '0.9rem', color: '#fff' };
