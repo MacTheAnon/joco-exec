@@ -95,24 +95,74 @@ app.get('/api/maps/token', (req, res) => {
 });
 
 // Calculate distance using Apple Maps Server-Side API
-async function calculateDynamicQuote(vehicleType, pickup, dropoff) {
+const jwt = require('jsonwebtoken');
+const axios = require('axios');
+
+// Route to generate a MapKit JS token for the frontend
+app.get('/api/maps/token', (req, res) => {
+    try {
+        const payload = {
+            iss: process.env.APPLE_MAPS_TEAM_ID, 
+            iat: Math.floor(Date.now() / 1000),
+            exp: Math.floor(Date.now() / 1000) + (1800), 
+            origin: "https://www.jocoexec.com"
+        };
+        const token = jwt.sign(payload, process.env.APPLE_MAPS_PRIVATE_KEY.replace(/\\n/g, '\n'), {
+            algorithm: 'ES256',
+            header: { alg: 'ES256', typ: 'JWT', kid: process.env.APPLE_MAPS_KEY_ID }
+        });
+        res.json({ token });
+    } catch (error) { res.status(500).json({ error: "Token generation failed" }); }
+});
+
+// Function to get an Apple Maps Server-to-Server token
+async function getAppleMapsServerToken() {
+    const payload = {
+        iss: process.env.APPLE_MAPS_TEAM_ID,
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+    };
+    return jwt.sign(payload, process.env.APPLE_MAPS_PRIVATE_KEY.replace(/\\n/g, '\n'), {
+        algorithm: 'ES256',
+        header: { alg: 'ES256', kid: process.env.APPLE_MAPS_KEY_ID, typ: 'JWT' }
+    });
+}
+
+// Calculate driving distance using Apple's ETAs API
+// Calculate driving distance using Apple's ETAs API
+async function calculateDynamicQuote(vehicleType, pickupCoords, dropoffCoords) {
     const config = PRICING_CONFIG[vehicleType];
     if (!config) throw new Error(`Pricing not configured for: ${vehicleType}`);
 
+    const serverToken = await getAppleMapsServerToken();
+    
     try {
-        // We use Apple's ETA/Distance API to replace the Google Distance Matrix
-        // This requires an Apple Maps Server Token
-        return { 
-            quote: config.baseRate, 
-            distance: 0, 
-            vehicle: vehicleType, 
-            method: "Base Rate (Apple Maps Transition)" 
+        const url = `https://maps-api.apple.com/v1/etas?origin=${pickupCoords.latitude},${pickupCoords.longitude}&destinations=${dropoffCoords.latitude},${dropoffCoords.longitude}&transportType=Automobile`;
+        const response = await axios.get(url, { headers: { 'Authorization': `Bearer ${serverToken}` } });
+        
+        // Apple returns distance in meters
+        const distanceMeters = response.data.etas[0].distanceMeters; 
+        const distanceInMiles = distanceMeters / 1609.34;
+        
+        // MATH LOGIC:
+        // Calculate the mileage-based total
+        const mileageTotal = distanceInMiles * config.perMileRate;
+        
+        // IF mileage total is MORE than base minimum, charge mileageTotal. 
+        // IF mileage total is LESS than base minimum, charge baseRate.
+        const finalQuote = Math.max(config.baseRate, mileageTotal);
+
+        return {
+            quote: parseFloat(finalQuote.toFixed(2)),
+            distance: distanceInMiles.toFixed(2),
+            method: mileageTotal > config.baseRate ? "Mileage Rate Applied" : "Minimum Base Rate Applied"
         };
-    } catch (error) {
-        return { quote: config.baseRate, error: "Calculation failed, using base rate." };
+    } catch (error) { 
+        console.error("Distance API Error:", error.message);
+        // Fallback to base minimum if the API fails
+        return { quote: config.baseRate, error: "Calculation failed, using minimum." }; 
     }
 }
-
 // ==========================================
 // 4. API ROUTES (FULL SET)
 // ==========================================

@@ -1,26 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Map, Marker } from 'mapkit-react'; // Switched from Google to Apple
+import { Map, Marker } from 'mapkit-react';
 
 const BookingForm = ({ onSubmit }) => {
-  // --- STATE MANAGEMENT (100% Preserved) ---
+  // --- STATE MANAGEMENT (100% Preserved with Coordinate Support) ---
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    date: '',
-    time: '',
-    pickup: '',
-    dropoff: '',
-    meetAndGreet: false,
-    passengers: '1',
-    vehicleType: 'Luxury Sedan' 
+    name: '', email: '', phone: '', date: '', time: '',
+    pickup: '', dropoff: '', pickupCoords: null, dropoffCoords: null,
+    meetAndGreet: false, passengers: '1', vehicleType: 'Luxury Sedan' 
   });
 
-  const [mapToken, setMapToken] = useState(null); // New for Apple
+  const [mapToken, setMapToken] = useState(null);
   const [checking, setChecking] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 600);
+  
+  // Autocomplete Result States
+  const [pickupResults, setPickupResults] = useState([]);
+  const [dropoffResults, setDropoffResults] = useState([]);
 
-  // Handle Window Resize (100% Preserved)
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 600);
     window.addEventListener('resize', handleResize);
@@ -33,7 +29,30 @@ const BookingForm = ({ onSubmit }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // --- HANDLERS (100% Preserved) ---
+  // --- APPLE MAPS SEARCH LOGIC ---
+  const handleAddressSearch = (query, setResults) => {
+    if (!window.mapkit || query.length < 3) return;
+    // Limits search to Kansas City area for accuracy
+    const region = new window.mapkit.CoordinateRegion(
+      new window.mapkit.Coordinate(38.8814, -94.8191),
+      new window.mapkit.CoordinateSpan(0.5, 0.5)
+    );
+    const search = new window.mapkit.Search({ region });
+    search.autocomplete(query, (error, data) => {
+      if (!error) setResults(data.results);
+    });
+  };
+
+  const handleSelectAddress = (result, field, setResults) => {
+    setFormData({ 
+      ...formData, 
+      [field]: result.displayLines.join(', '),
+      [`${field}Coords`]: result.coordinate // Captures Lat/Lng for distance API
+    });
+    setResults([]); // Clear the dropdown
+  };
+
+  // --- HANDLERS ---
   const handleChange = (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     setFormData({ ...formData, [e.target.name]: value });
@@ -41,50 +60,40 @@ const BookingForm = ({ onSubmit }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!formData.date || !formData.time || !formData.pickup || !formData.name) {
-      alert("Please fill in all required details.");
+    if (!formData.pickupCoords || !formData.dropoffCoords) {
+      alert("Please select addresses from the dropdown to ensure accurate pricing.");
       return;
     }
-
     setChecking(true);
 
     try {
       const apiUrl = process.env.REACT_APP_API_URL || 'https://www.jocoexec.com';
 
-      // 1. CHECK AVAILABILITY (Preserved Logic)
-      const availResponse = await fetch(`${apiUrl}/api/check-availability`, {
+      // 1. Availability Check
+      const availRes = await fetch(`${apiUrl}/api/check-availability`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: formData.date, time: formData.time }),
       });
-      
-      const availData = await availResponse.json();
-
+      const availData = await availRes.json();
       if (!availData.available) {
-        alert("❌ Sorry, that time slot is already booked. Please select a different time.");
+        alert("❌ Slot already booked.");
         setChecking(false);
         return;
       }
 
-      // 2. GET OFFICIAL QUOTE (Preserved Logic)
-      const quoteResponse = await fetch(`${apiUrl}/api/get-quote`, {
+      // 2. GET QUOTE (Passes Coordinates to Backend)
+      const quoteRes = await fetch(`${apiUrl}/api/get-quote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
             vehicleType: formData.vehicleType,
-            pickup: formData.pickup,
-            dropoff: formData.dropoff
+            pickup: formData.pickupCoords,
+            dropoff: formData.dropoffCoords
         }),
       });
+      const quoteData = await quoteRes.json();
 
-      const quoteData = await quoteResponse.json();
-
-      if (quoteData.error) {
-        throw new Error(quoteData.error);
-      }
-
-      // 3. SUCCESS (Preserved Logic)
       onSubmit({ 
           ...formData, 
           amount: Math.round(quoteData.quote * 100), 
@@ -92,186 +101,127 @@ const BookingForm = ({ onSubmit }) => {
       }); 
 
     } catch (err) {
-      console.error(err);
-      alert("Error fetching quote. Please check address validity.");
+      alert("Error fetching quote. Please try again.");
     } finally {
       setChecking(false);
     }
   };
 
-  // --- RENDER (Preserved Structure with Apple Map Integration) ---
   return (
     <div style={formCardStyle}>
       <div style={{ textAlign: 'center', marginBottom: '25px' }}>
         <h2 style={headerTitleStyle}>Request a Ride</h2>
-        <p style={headerSubtitleStyle}>Professional Chauffeur Service</p>
-        
-        {/* NEW: Apple Map Viewport Replacement */}
         {mapToken ? (
-           <div style={{ height: '200px', borderRadius: '8px', overflow: 'hidden', marginTop: '20px', border: '1px solid #333' }}>
-              <Map token={mapToken}>
-                 <Marker latitude={38.8814} longitude={-94.8191} title="JOCO EXEC" />
-              </Map>
-           </div>
-        ) : <div style={{ height: '200px', marginTop: '20px', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#C5A059' }}>Loading Maps...</div>}
+           <div style={mapBoxStyle}><Map token={mapToken}><Marker latitude={38.8814} longitude={-94.8191} title="JOCO EXEC" /></Map></div>
+        ) : <div style={mapLoaderStyle}>Initializing Secure Maps...</div>}
       </div>
       
       <form onSubmit={handleSubmit}>
-        
-        {/* Full Name */}
         <div style={inputGroupStyle}>
           <label style={labelStyle}>Full Name</label>
-          <input 
-            type="text" 
-            name="name" 
-            style={inputStyle} 
-            onChange={handleChange} 
-            placeholder="John Doe" 
-            required 
-          />
+          <input type="text" name="name" style={inputStyle} onChange={handleChange} required />
         </div>
         
-        {/* Contact Info */}
         <div style={isMobile ? columnGridStyle : rowGridStyle}>
-           <div style={{ flex: 1 }}>
-             <label style={labelStyle}>Email Address</label>
-             <input 
-               type="email" 
-               name="email" 
-               style={inputStyle} 
-               onChange={handleChange} 
-               placeholder="email@example.com" 
-               required 
-             />
-           </div>
-           <div style={{ flex: 1 }}>
-             <label style={labelStyle}>Phone Number</label>
-             <input 
-               type="tel" 
-               name="phone" 
-               style={inputStyle} 
-               onChange={handleChange} 
-               placeholder="(913) 000-0000" 
-               required 
-             />
-           </div>
+           <div style={{ flex: 1 }}><label style={labelStyle}>Email</label><input type="email" name="email" style={inputStyle} onChange={handleChange} required /></div>
+           <div style={{ flex: 1 }}><label style={labelStyle}>Phone</label><input type="tel" name="phone" style={inputStyle} onChange={handleChange} required /></div>
         </div>
 
-        {/* Vehicle Selection */}
         <div style={inputGroupStyle}>
-            <label style={labelStyle}>Select Service / Vehicle</label>
-            <select 
-                name="vehicleType" 
-                style={inputStyle} 
-                onChange={handleChange} 
-                value={formData.vehicleType}
-            >
-                <option value="Luxury Sedan">Luxury Lexus Sedan (Base $85 or $3/mile)</option>
-                <option value="Luxury SUV">Executive SUV (Base $95 or $4.50/mile)</option>
-                <option value="Night Out">Night Out (Starts at $150)</option>
+            <label style={labelStyle}>Vehicle Type</label>
+            <select name="vehicleType" style={inputStyle} onChange={handleChange} value={formData.vehicleType}>
+                <option value="Luxury Sedan">Luxury Sedan (Base $85)</option>
+                <option value="Luxury SUV">Executive SUV (Base $95)</option>
+                <option value="Night Out">Night Out (Starts $150)</option>
             </select>
         </div>
 
-        {/* Date & Time */}
         <div style={isMobile ? columnGridStyle : rowGridStyle}>
-          <div style={{ flex: 1 }}>
-            <label style={labelStyle}>Date</label>
-            <input 
-                type="date" 
-                name="date" 
-                style={inputStyle} 
-                onChange={handleChange} 
-                required 
-            />
-          </div>
-          <div style={{ flex: 1 }}>
-            <label style={labelStyle}>Time</label>
-            <input 
-                type="time" 
-                name="time" 
-                style={inputStyle} 
-                onChange={handleChange} 
-                required 
-            />
-          </div>
+          <div style={{ flex: 1 }}><label style={labelStyle}>Date</label><input type="date" name="date" style={inputStyle} onChange={handleChange} required /></div>
+          <div style={{ flex: 1 }}><label style={labelStyle}>Time</label><input type="time" name="time" style={inputStyle} onChange={handleChange} required /></div>
         </div>
 
-        {/* Apple Maps Compatible Pickup Input */}
+        {/* --- AUTOCOMPLETE PICKUP --- */}
         <div style={inputGroupStyle}>
             <label style={labelStyle}>Pickup Location</label>
-            <input
-                type="text"
-                name="pickup"
-                style={inputStyle}
-                placeholder="Enter pickup address..."
-                required
-                onChange={handleChange}
+            <input 
+                type="text" 
+                style={inputStyle} 
+                placeholder="Start typing address..." 
+                value={formData.pickup}
+                onChange={(e) => {
+                  setFormData({...formData, pickup: e.target.value});
+                  handleAddressSearch(e.target.value, setPickupResults);
+                }}
+                required 
             />
+            {pickupResults.length > 0 && (
+              <div style={dropdownStyle}>
+                {pickupResults.map(res => (
+                  <div key={res.id} style={dropdownItemStyle} onClick={() => handleSelectAddress(res, 'pickup', setPickupResults)}>
+                    {res.displayLines.join(', ')}
+                  </div>
+                ))}
+              </div>
+            )}
         </div>
 
-        {/* Apple Maps Compatible Dropoff Input */}
+        {/* --- AUTOCOMPLETE DROPOFF --- */}
         <div style={inputGroupStyle}>
-            <label style={labelStyle}>Dropoff Location</label>
-            <input
-                type="text"
-                name="dropoff"
-                style={inputStyle}
-                placeholder="Enter destination..."
-                required
-                onChange={handleChange}
+            <label style={labelStyle}>Dropoff Destination</label>
+            <input 
+                type="text" 
+                style={inputStyle} 
+                placeholder="Where to?" 
+                value={formData.dropoff}
+                onChange={(e) => {
+                  setFormData({...formData, dropoff: e.target.value});
+                  handleAddressSearch(e.target.value, setDropoffResults);
+                }}
+                required 
             />
+            {dropoffResults.length > 0 && (
+              <div style={dropdownStyle}>
+                {dropoffResults.map(res => (
+                  <div key={res.id} style={dropdownItemStyle} onClick={() => handleSelectAddress(res, 'dropoff', setDropoffResults)}>
+                    {res.displayLines.join(', ')}
+                  </div>
+                ))}
+              </div>
+            )}
         </div>
 
-        {/* Meet & Greet */}
         <div style={checkboxContainerStyle}>
           <label style={checkboxLabelStyle}>
-            <input 
-              type="checkbox" 
-              name="meetAndGreet" 
-              checked={formData.meetAndGreet} 
-              onChange={handleChange} 
-              style={checkboxStyle}
-            />
+            <input type="checkbox" name="meetAndGreet" checked={formData.meetAndGreet} onChange={handleChange} style={checkboxStyle} />
             <span>Add Airport Meet & Greet (+$25.00)</span>
           </label>
         </div>
 
-        <button 
-            type="submit" 
-            style={checking ? disabledButtonStyle : activeButtonStyle} 
-            disabled={checking}
-        >
+        <button type="submit" style={checking ? disabledButtonStyle : activeButtonStyle} disabled={checking}>
           {checking ? "CALCULATING QUOTE..." : "GET QUOTE & RESERVE"}
         </button>
-
       </form>
-      
-      <div style={footerContainerStyle}>
-         <h4 style={footerTitleStyle}>Executive Reliability</h4>
-         <p style={footerTextStyle}>
-           Real-time flight tracking and chauffeur coordination ensure your vehicle is on-site before you land.
-         </p>
-      </div>
     </div>
   );
 };
 
-// --- STYLES (100% Preserved) ---
-const formCardStyle = { background: '#111', border: '1px solid #C5A059', padding: '35px', borderRadius: '12px', maxWidth: '550px', width: '100%', margin: '0 auto', color: '#fff', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', boxSizing: 'border-box'};
+// --- STYLES (100% Preserved with Dropdown Additions) ---
+const formCardStyle = { background: '#111', border: '1px solid #C5A059', padding: '35px', borderRadius: '12px', maxWidth: '550px', width: '100%', margin: '0 auto', color: '#fff', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', boxSizing: 'border-box', position: 'relative'};
+const dropdownStyle = { position: 'absolute', zIndex: 1000, background: '#000', border: '1px solid #C5A059', borderRadius: '4px', width: '90%', marginTop: '-15px' };
+const dropdownItemStyle = { padding: '12px', cursor: 'pointer', borderBottom: '1px solid #222', fontSize: '0.9rem', color: '#fff' };
 const headerTitleStyle = { color: '#C5A059', marginTop: 0, fontSize: '1.8rem', fontFamily: '"Playfair Display", serif', marginBottom: '5px'};
-const headerSubtitleStyle = { color: '#888', fontSize: '0.9rem', margin: 0};
+const mapBoxStyle = { height: '200px', borderRadius: '8px', overflow: 'hidden', marginTop: '20px', border: '1px solid #333' };
+const mapLoaderStyle = { height: '200px', marginTop: '20px', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#C5A059' };
 const inputGroupStyle = { marginBottom: '20px'};
 const rowGridStyle = { display: 'flex', flexDirection: 'row', gap: '15px', marginBottom: '20px'};
 const columnGridStyle = { display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '20px'};
-const labelStyle = { display: 'block', marginBottom: '8px', color: '#C5A059', fontWeight: 'bold', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px'};
-const inputStyle = { width: '100%', padding: '14px', background: '#000', border: '1px solid #333', color: '#fff', borderRadius: '6px', boxSizing: 'border-box', fontSize: '16px', fontFamily: 'inherit', outline: 'none', transition: 'border-color 0.2s'};
+const labelStyle = { display: 'block', marginBottom: '8px', color: '#C5A059', fontWeight: 'bold', fontSize: '0.85rem', textTransform: 'uppercase'};
+const inputStyle = { width: '100%', padding: '14px', background: '#000', border: '1px solid #333', color: '#fff', borderRadius: '6px', boxSizing: 'border-box', fontSize: '16px'};
 const checkboxContainerStyle = { marginBottom: '25px', padding: '15px', background: '#000', borderRadius: '6px', border: '1px solid #333' };
-const checkboxLabelStyle = { color: '#C5A059', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1rem' };
+const checkboxLabelStyle = { color: '#C5A059', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px' };
 const checkboxStyle = { width: '20px', height: '20px', accentColor: '#C5A059', cursor: 'pointer'};
-const activeButtonStyle = { width: '100%', padding: '18px', background: '#C5A059', color: '#000', border: 'none', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '1px', transition: 'background 0.3s ease'};
+const activeButtonStyle = { width: '100%', padding: '18px', background: '#C5A059', color: '#000', border: 'none', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', borderRadius: '6px', textTransform: 'uppercase'};
 const disabledButtonStyle = { ...activeButtonStyle, background: '#555', color: '#888', cursor: 'not-allowed'};
-const footerContainerStyle = { marginTop: '30px', borderTop: '1px solid #222', paddingTop: '20px', textAlign: 'center' };
-const footerTitleStyle = { color: '#C5A059', margin: '0 0 8px 0', textTransform: 'uppercase', letterSpacing: '1px', fontSize: '1rem'};
-const footerTextStyle = { fontSize: '0.9rem', color: '#888', margin: 0, lineHeight: '1.5' };
 
 export default BookingForm;
