@@ -9,7 +9,7 @@ const fs = require('fs');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const twilio = require('twilio');
+const twilio = require('twilio'); // RESTORED
 const axios = require('axios'); 
 require('dotenv').config();
 
@@ -32,11 +32,11 @@ const PRICING_CONFIG = {
     'Night Out':     { baseRate: 150, perMileRate: 4.50 } 
 };
 
-// ==========================================
-// 2. CLIENT INITIALIZATION
-// ==========================================
-
 const app = express();
+
+// MIDDLEWARE - Helmet removed here
+app.use(cors());
+app.use(express.json());
 
 const squareClient = new SquareClient({
     token: process.env.SQUARE_ACCESS_TOKEN,
@@ -49,6 +49,9 @@ const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
 });
+
+// ==========================================
+// 2. DATA UTILITIES
 // ==========================================
 const getBookings = () => {
     if (!fs.existsSync(DB_FILE)) fs.writeFileSync(DB_FILE, '[]');
@@ -118,7 +121,6 @@ app.post('/api/check-availability', (req, res) => {
         const isTaken = bookings.some(b => b.date === date && b.time === time);
         res.json({ available: !isTaken });
     } catch (err) {
-        console.error("Availability Error:", err);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
@@ -178,17 +180,8 @@ app.post('/api/auth/register', async (req, res) => {
 app.post('/api/process-payment', async (req, res) => {
     const { sourceId, vehicleType, pickup, dropoff, bookingDetails } = req.body;
     try {
-        let amountInCents;
-        let pricingResult = {};
-
-        if (vehicleType && pickup && dropoff) {
-            pricingResult = await calculateDynamicQuote(vehicleType, pickup, dropoff);
-            amountInCents = BigInt(Math.round(pricingResult.quote * 100));
-        } else if (req.body.amount) {
-            amountInCents = BigInt(req.body.amount);
-        } else {
-            throw new Error("Missing pricing details.");
-        }
+        let pricingResult = await calculateDynamicQuote(vehicleType, pickup, dropoff);
+        let amountInCents = BigInt(Math.round(pricingResult.quote * 100));
 
         if (bookingDetails && bookingDetails.meetAndGreet) {
             amountInCents += BigInt(2500); 
@@ -209,7 +202,7 @@ app.post('/api/process-payment', async (req, res) => {
         };
         saveBooking(newBooking);
         
-        // Notify Drivers
+        // Notify Drivers (FEATURE PRESERVED)
         const approvedDrivers = getUsers().filter(u => u.role === 'driver' && u.isApproved === true);
         approvedDrivers.forEach(async (driver) => {
             transporter.sendMail({
@@ -254,8 +247,6 @@ app.delete('/api/admin/bookings/:id', (req, res) => {
 // ==========================================
 // 6. FRONTEND & START SERVER
 // ==========================================
-
-// ✅ CORRECTED PATH to match your folder structure
 app.use(express.static(path.join(__dirname, 'client', 'build')));
 
 app.get(/.*/, (req, res) => {

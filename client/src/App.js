@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'; 
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
-import CookieConsent from "react-cookie-consent"; // ✅ NEW IMPORT
 
 // Import Pages
 import Home from './pages/Home';
@@ -21,16 +20,17 @@ function App() {
   const [user, setUser] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
-  // Track window size in state so the menu updates instantly on resize/rotate
+  // Track window size in state for responsive menu behavior
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
+    // Check for existing session
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
 
-    // Add Resize Listener
+    // Add Resize Listener to handle mobile view dynamically
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -66,7 +66,7 @@ function App() {
             </div>
           </Link>
 
-          {/* Hamburger Icon (Only shows if isMobile is true) */}
+          {/* Hamburger Icon */}
           <button 
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             style={{
@@ -81,7 +81,7 @@ function App() {
             {isMenuOpen ? '✕' : '☰'}
           </button>
           
-          {/* Navigation Links */}
+          {/* Navigation Links - Dynamically toggled for mobile */}
           <div style={{
             display: (isMenuOpen || !isMobile) ? 'flex' : 'none',
             flexDirection: isMobile ? 'column' : 'row',
@@ -114,8 +114,8 @@ function App() {
           </div>
         </nav>
 
-        {/* --- ROUTES --- */}
-        <div style={{flex: 1}}>
+        {/* --- MAIN CONTENT & ROUTES --- */}
+        <div style={{width: '100%', flex: 1}}>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/booking" element={<Booking />} />
@@ -125,41 +125,12 @@ function App() {
             <Route path="/terms" element={<Terms />} />
             <Route path="/refunds" element={<Refunds />} />
 
-            {/* Protected Routes */}
+            {/* Protected Routes logic preserved */}
             <Route path="/admin" element={user && user.role === 'admin' ? <Admin /> : <Navigate to="/login" />} />
             <Route path="/dashboard" element={user ? <Dashboard /> : <Navigate to="/login" />} />
             <Route path="/driver-dashboard" element={user && user.role === 'driver' ? <DriverDashboard /> : <Navigate to="/login" />} />
           </Routes>
         </div>
-
-        {/* ✅ CONSENT BANNER (Gold & Black Theme) */}
-        <CookieConsent
-          location="bottom"
-          buttonText="I Understand"
-          cookieName="joco_cookie_consent"
-          style={{ 
-            background: "#111", 
-            borderTop: "1px solid #C5A059", 
-            alignItems: "center",
-            zIndex: 9999 
-          }}
-          buttonStyle={{ 
-            background: "#C5A059", 
-            color: "#000", 
-            fontSize: "14px", 
-            fontWeight: "bold", 
-            borderRadius: "4px",
-            padding: "10px 20px"
-          }}
-          expires={150}
-        >
-          <span style={{ color: "#ccc" }}>
-            This website uses cookies to ensure you get the best experience on our booking platform. 
-            <a href="/privacy" style={{ color: "#C5A059", textDecoration: "underline", marginLeft: "5px" }}>
-              Privacy Policy
-            </a>
-          </span>
-        </CookieConsent>
 
         <Footer />
       </div>
@@ -167,7 +138,7 @@ function App() {
   );
 }
 
-// Styles
+// Inline Styles
 const navLinkStyle = { color: '#fff', textDecoration: 'none', padding: '10px' };
 const goldLinkStyle = { ...navLinkStyle, color: '#C5A059', fontWeight: 'bold' };
 const logoutBtnStyle = { background: 'transparent', color: '#fff', border: '1px solid #444', padding: '5px 12px', cursor: 'pointer', borderRadius: '4px', marginLeft: '10px' };
