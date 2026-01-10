@@ -277,23 +277,21 @@ app.delete('/api/admin/bookings/:id', (req, res) => {
     res.json({ success: true });
 });
 
-// ==========================================
-// 5. PRODUCTION STATIC SERVING
-// ==========================================
 const clientBuildPath = path.join(__dirname, 'client', 'build');
 const rootBuildPath = path.join(__dirname, 'build');
 
-// Handle API 404s specifically so they don't return index.html
 app.use('/api', (req, res) => res.status(404).json({ error: 'API route not found' }));
 
 if (fs.existsSync(clientBuildPath)) {
     app.use(express.static(clientBuildPath));
-    // Updated catch-all syntax for production
-    app.get('/*', (req, res) => res.sendFile(path.join(clientBuildPath, 'index.html')));
 } else if (fs.existsSync(rootBuildPath)) {
     app.use(express.static(rootBuildPath));
-    // Updated catch-all syntax for production
-    app.get('/*', (req, res) => res.sendFile(path.join(rootBuildPath, 'index.html')));
 }
+
+// Regex catch-all to prevent PathError in Express 5/Railway
+app.get('(.*)', (req, res) => {
+    const target = fs.existsSync(clientBuildPath) ? clientBuildPath : rootBuildPath;
+    res.sendFile(path.join(target, 'index.html'));
+});
 
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 JOCO EXEC running on port ${PORT}`));
