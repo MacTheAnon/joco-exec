@@ -277,21 +277,31 @@ app.delete('/api/admin/bookings/:id', (req, res) => {
     res.json({ success: true });
 });
 
+// ==========================================
+// 5. PRODUCTION STATIC SERVING
+// ==========================================
 const clientBuildPath = path.join(__dirname, 'client', 'build');
 const rootBuildPath = path.join(__dirname, 'build');
 
-app.use('/api', (req, res) => res.status(404).json({ error: 'API route not found' }));
-
+// Serve static files (CSS, JS, Images)
 if (fs.existsSync(clientBuildPath)) {
     app.use(express.static(clientBuildPath));
 } else if (fs.existsSync(rootBuildPath)) {
     app.use(express.static(rootBuildPath));
 }
 
-// Regex catch-all to prevent PathError in Express 5/Railway
-app.get('(.*)', (req, res) => {
+// Handle API 404s so they don't get trapped by the React wildcard
+app.use('/api', (req, res) => res.status(404).json({ error: 'API route not found' }));
+
+// Express 5.0 compatible catch-all route for React Router
+app.get('/:any*', (req, res) => {
     const target = fs.existsSync(clientBuildPath) ? clientBuildPath : rootBuildPath;
     res.sendFile(path.join(target, 'index.html'));
 });
 
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 JOCO EXEC running on port ${PORT}`));
+// START SERVER
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 JOCO EXEC Server Active`);
+    console.log(`🚀 Port: ${PORT}`);
+    console.log(`🚀 Pricing Engine: Online`);
+});
