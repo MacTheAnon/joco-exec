@@ -73,11 +73,10 @@ const saveUser = (u) => {
 };
 
 // ==========================================
-// 3. APPLE MAPS INTEGRATION (SAFE STATIC TOKENS)
+// 3. APPLE MAPS INTEGRATION (UNIVERSAL FIX)
 // ==========================================
 
-// These are the valid, pre-approved tokens from your CSV.
-// We use these because your Private Key configuration might be buggy.
+// Valid pre-approved tokens from your CSV
 const MAPS_TOKENS = {
     // Live Production
     "www.jocoexec.com": "eyJraWQiOiI2VTgySkZDNlhUIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg0NjQ4LCJvcmlnaW4iOiJ3d3cuam9jb2V4ZWMuY29tIn0.-gPvMZbjh6DKKeTbEZP0QRgaEkxfA1X1jcO3ZZPenAzhhOd9t_gsBzaOxnGGTUaPQkl-2XbxoNpKOva-B8ZRCw",
@@ -107,7 +106,7 @@ app.get('/api/maps/token', (req, res) => {
         // Select the correct pre-approved token
         let token = MAPS_TOKENS[cleanDomain];
 
-        // If no specific match found, use the Wildcard token
+        // If no specific match found (e.g. admin.jocoexec.com), use the Wildcard token
         if (!token) {
             console.log(`[WARN] No exact match for ${cleanDomain}. Using Wildcard.`);
             token = MAPS_TOKENS["default"];
@@ -126,7 +125,7 @@ async function calculateDynamicQuote(vehicleType, pickupCoords, dropoffCoords) {
     if (!config) throw new Error(`Pricing not configured for: ${vehicleType}`);
 
     try {
-        // Use the main website token for server-side calculations
+        // FORCE 'www' token for server calculations because we know it's valid
         const serverToken = MAPS_TOKENS["www.jocoexec.com"];
         
         const url = `https://maps-api.apple.com/v1/etas?origin=${pickupCoords.latitude},${pickupCoords.longitude}&destinations=${dropoffCoords.latitude},${dropoffCoords.longitude}&transportType=Automobile`;
