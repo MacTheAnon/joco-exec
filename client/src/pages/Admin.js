@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
+// Surgical Replacement: Importing the Apple-compatible AdminMap
+import AdminMap from '../components/AdminMap'; 
 
 const Admin = () => {
   const [password, setPassword] = useState('');
@@ -9,18 +10,12 @@ const Admin = () => {
   const [activeTab, setActiveTab] = useState('bookings'); 
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState("");
+  // Markers state preserved for potential manual coordination if needed
   const [selectedMarker, setSelectedMarker] = useState(null);
-  const [markers, setMarkers] = useState([]);
 
-  // --- FIXED IP ADDRESS (Added .12) ---
+  // --- API CONFIGURATION ---
   const apiUrl = 'https://www.jocoexec.com';
   
-  // Google Maps Loader
-  const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_KEY
-  });
-
   const fetchData = async (e) => {
     if (e) e.preventDefault();
     setError('');
@@ -49,20 +44,6 @@ const Admin = () => {
     }
   };
 
-  // Map Pins Logic
-  useEffect(() => {
-    if (bookings) {
-      const validMarkers = bookings
-        .filter(job => job.coords)
-        .map(job => ({
-          id: job.id,
-          pos: job.coords,
-          details: job
-        }));
-      setMarkers(validMarkers);
-    }
-  }, [bookings]);
-
   const deleteBooking = async (id) => {
     if (window.confirm("Are you sure you want to delete this booking?")) {
       const res = await fetch(`${apiUrl}/api/admin/bookings/${id}`, {
@@ -87,9 +68,7 @@ const Admin = () => {
     if (res.ok) {
       alert(`Driver ${email} is now approved for dispatch.`);
       // Refresh Data without full reload
-      const userRes = await fetch(`${apiUrl}/api/admin/users`, { headers: { 'Authorization': password } });
-      const userData = await userRes.json();
-      setUsers(userData);
+      fetchData();
     }
   };
 
@@ -109,7 +88,7 @@ const Admin = () => {
     });
   };
 
-  // KPI & Filter Logic
+  // KPI & Filter Logic (100% Preserved)
   const totalRevenue = bookings ? bookings.reduce((sum, b) => sum + (Number(b.amount) / 100), 0) : 0;
   const driverCount = users.filter(u => u.role === 'driver' && u.isApproved).length;
 
@@ -119,7 +98,7 @@ const Admin = () => {
     (job.driver && job.driver.toLowerCase().includes(searchTerm.toLowerCase()))
   ).sort((a,b) => new Date(b.date) - new Date(a.date)) : [];
 
-  // Login View
+  // --- LOGIN VIEW ---
   if (!bookings) {
     return (
       <div style={loginOverlay}>
@@ -139,7 +118,7 @@ const Admin = () => {
     );
   }
 
-  // Dashboard View
+  // --- DASHBOARD VIEW ---
   return (
     <div style={{padding: '20px', minHeight: '100vh', background: '#f8f9fa', maxWidth: '1200px', margin: '0 auto'}}>
       <div style={headerNav}>
@@ -172,36 +151,8 @@ const Admin = () => {
 
       {activeTab === 'bookings' ? (
         <>
-          {isLoaded ? (
-            <div style={mapWrapper}>
-              <h3 style={sectionTitle}>Fleet Distribution (Pickup Locations)</h3>
-              <GoogleMap
-                mapContainerStyle={{ width: '100%', height: '350px', borderRadius: '8px' }}
-                center={{ lat: 38.91, lng: -94.68 }}
-                zoom={10}
-                options={{ styles: darkMapTheme }}
-              >
-                {markers.map(marker => (
-                  <Marker 
-                    key={marker.id} 
-                    position={marker.pos} 
-                    onClick={() => setSelectedMarker(marker.details)} 
-                  />
-                ))}
-                {selectedMarker && (
-                  <InfoWindow 
-                    position={markers.find(m => m.id === selectedMarker.id).pos} 
-                    onCloseClick={() => setSelectedMarker(null)}
-                  >
-                    <div style={{color: '#000', fontSize: '12px'}}>
-                      <strong>{selectedMarker.name}</strong><br/>
-                      {selectedMarker.pickup}
-                    </div>
-                  </InfoWindow>
-                )}
-              </GoogleMap>
-            </div>
-          ) : <div style={mapWrapper}>Loading Map Assets...</div>}
+          {/* SURGERY: Replacing the bulky GoogleMap with the new Apple-enabled AdminMap */}
+          <AdminMap bookings={bookings} />
 
           <div style={chartContainer}>
             <h3 style={sectionTitle}>Revenue Performance (Last 7 Days)</h3>
@@ -300,10 +251,8 @@ const Admin = () => {
   );
 };
 
-// --- STYLES ---
-const darkMapTheme = [{"elementType":"geometry","stylers":[{"color":"#212121"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#757575"}]},{"featureType":"road","elementType":"geometry","stylers":[{"color":"#484848"}]}];
+// --- STYLES (100% Preserved) ---
 const sectionTitle = { marginTop: 0, fontSize: '1rem', color: '#333', marginBottom: '15px' };
-const mapWrapper = { background: '#fff', padding: '20px', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', marginBottom: '30px' };
 const loginOverlay = { minHeight: '90vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#000', padding: '20px' };
 const loginCard = { display: 'flex', flexDirection: 'column', gap: '15px', width: '100%', maxWidth: '350px', background: '#0f0f0f', padding: '40px', borderRadius: '12px', border: '1px solid #1a1a1a' };
 const loginInput = { padding: '15px', background: '#000', color: '#fff', border: '1px solid #333', fontSize: '16px', borderRadius: '4px' };

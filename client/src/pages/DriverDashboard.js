@@ -10,7 +10,7 @@ const DriverDashboard = () => {
     const fetchJobs = async () => {
       try {
         const token = localStorage.getItem('token');
-        // UPDATED: Points to your new Windows Victus IP
+        // Points to production domain
         const res = await fetch('https://www.jocoexec.com/api/user/my-bookings', {
           headers: { 'Authorization': token }
         });
@@ -80,8 +80,11 @@ const DriverDashboard = () => {
                   <p style={{ margin: 0 }}>🏁 {job.dropoff}</p>
                 </div>
 
+                {/* REMOVED: googleusercontent/maps.google.com link
+                   ADDED: Standard Apple Maps URL Scheme for Navigation
+                */}
                 <a 
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.pickup)}`}
+                  href={`https://maps.apple.com/?daddr=${encodeURIComponent(job.pickup)}&dirflg=d`}
                   target="_blank" 
                   rel="noreferrer"
                   style={{

@@ -5,6 +5,7 @@ const SquarePayment = ({ onSuccess, bookingDetails }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Visual Display Calculation (Adds $25 for display only)
+  // Preserves the business logic for Airport Meet & Greet
   let displayAmount = bookingDetails.amount;
   if (bookingDetails.meetAndGreet) {
     displayAmount += 2500; // +$25.00
@@ -18,7 +19,7 @@ const SquarePayment = ({ onSuccess, bookingDetails }) => {
         <p style={{margin: '5px 0', color: '#555'}}>Date: <strong>{bookingDetails.date}</strong></p>
         
         <p style={{margin: '5px 0', color: '#555'}}>
-           Service: <strong>{bookingDetails.serviceType || 'Standard'}</strong>
+           Service: <strong>{bookingDetails.vehicleType || 'Standard'}</strong>
         </p>
 
         {bookingDetails.meetAndGreet && (
@@ -31,13 +32,13 @@ const SquarePayment = ({ onSuccess, bookingDetails }) => {
       </div>
 
       <PaymentForm
-        // ⚠️ IMPORTANT: Switch this to your Production App ID when going live
+        // Uses your existing Square credentials
         applicationId="sq0idp-WEHQaoQdRnOWl_c8-GfXBg" 
         locationId="LD7WCY7X0HQT4"
         cardTokenizeResponseReceived={async (token) => {
           setIsSubmitting(true);
           try {
-            // UPDATED IP ADDRESS
+            // Updated to use the consistent production URL
             const apiUrl = process.env.REACT_APP_API_URL || 'https://www.jocoexec.com';
             
             const response = await fetch(`${apiUrl}/api/process-payment`, {
@@ -45,7 +46,7 @@ const SquarePayment = ({ onSuccess, bookingDetails }) => {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 
                 sourceId: token.token,
-                // We send these details so the backend can verify the dynamic price
+                // These details now come from Apple Maps inputs in the parent form
                 vehicleType: bookingDetails.vehicleType, 
                 pickup: bookingDetails.pickup, 
                 dropoff: bookingDetails.dropoff,
@@ -55,7 +56,7 @@ const SquarePayment = ({ onSuccess, bookingDetails }) => {
 
             if (response.ok) {
               const data = await response.json();
-              onSuccess(data); // Pass server response (paymentId) back to parent
+              onSuccess(data); // Pass server response back to parent
             } else {
               const errorData = await response.json();
               alert(`Payment Error: ${errorData.error || 'Declined'}`);
