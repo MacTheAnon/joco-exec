@@ -17,7 +17,6 @@ require('dotenv').config();
 BigInt.prototype.toJSON = function() { return this.toString(); };
 
 // --- SERVER CONSTANTS ---
-const BASE_URL = 'https://www.jocoexec.com';
 const PORT = process.env.PORT || 8080;
 const SECRET_KEY = process.env.JWT_SECRET || 'joco-executive-transportation-secret';
 
@@ -98,14 +97,14 @@ app.get('/api/maps/token', (req, res) => {
     }
 });
 
-// Server-to-Server Token for Apple ETAs API (Fixes 401 error)
+// Server-to-Server Token for Apple ETAs API
 async function getAppleMapsServerToken() {
     const iat = Math.floor(Date.now() / 1000);
     const payload = {
         iss: process.env.APPLE_MAPS_TEAM_ID || "827CZWJ6A7",
-        sub: "maps.www.jocoexec.com", // Link to your Identifier
+        sub: "maps.www.jocoexec.com",
         iat: iat,
-        exp: iat + 900 // Exactly 15 mins
+        exp: iat + 900
     };
     
     const privateKey = (process.env.APPLE_MAPS_PRIVATE_KEY || "").replace(/\\n/g, '\n');
@@ -291,14 +290,15 @@ if (fs.existsSync(clientBuildPath)) {
 }
 
 // 2. API 404 Handler - Important!
-// If a request starts with /api but matches nothing above, return JSON error
-app.use('/api/*', (req, res) => {
+// FIX: "app.use('/api', ...)" matches anything starting with /api that wasn't handled above
+// We REMOVED the "/*" wildcard to prevent crashes.
+app.use('/api', (req, res) => {
     res.status(404).json({ error: "API route not found" });
 });
 
-// 3. React Router "Catch-All" (The Fix)
-// By removing the path argument entirely, we bypass the 'path-to-regexp' error.
-// This middleware runs for ANY request that wasn't handled by the static files or API routes above.
+// 3. React Router Catch-All (FIXED)
+// FIX: "app.use(...)" with no path matches EVERYTHING else (i.e. frontend routes)
+// We REMOVED the "*" wildcard to prevent crashes.
 app.use((req, res) => {
     const target = fs.existsSync(clientBuildPath) ? clientBuildPath : rootBuildPath;
     res.sendFile(path.join(target, 'index.html'));
