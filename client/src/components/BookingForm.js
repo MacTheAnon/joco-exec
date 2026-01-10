@@ -15,7 +15,21 @@ const BookingForm = ({ onSubmit }) => {
   });
 
   // HARD-CODED FRONTEND TOKEN
-  const [mapToken] = useState("eyJraWQiOiJCWTVHNDJMWlpUIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDQ1MjMzLCJvcmlnaW4iOiJ3d3cuam9jb2V4ZWMuY29tIn0.LYH5xVhL5SuksZViPKEYE5XSHaEuCgsSbT9GdYAa7CY22Z8ywpv_j5RxXQzTqjpiuGPUX0tPwetJCPTgr4G4VA");
+  // Inside BookingForm component
+const [mapToken, setMapToken] = useState("");
+
+useEffect(() => {
+    // Fetch fresh token on load
+    fetch('/api/maps/token')
+        .then(res => res.json())
+        .then(data => setMapToken(data.token))
+        .catch(err => console.error("Could not load MapKit token"));
+}, []);
+
+// Update the Map component to use the dynamic state
+<Map token={mapToken}>
+    <Marker latitude={38.8814} longitude={-94.8191} title="JOCO EXEC" />
+</Map>
   
   const [checking, setChecking] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 600);
