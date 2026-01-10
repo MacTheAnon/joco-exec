@@ -100,16 +100,23 @@ app.get('/api/maps/token', (req, res) => {
 async function getAppleMapsServerToken() {
     const iat = Math.floor(Date.now() / 1000);
     const payload = {
-        iss: process.env.APPLE_MAPS_TEAM_ID,
+        iss: "827CZWJ6A7", // Verified Team ID from Screenshot 1
         iat: iat,
-        exp: iat + 900, // 15 minutes - Mandatory for server APIs
+        exp: iat + 900,   // 15 minutes (Must be < 20 for Apple Server API)
     };
-    return jwt.sign(payload, process.env.APPLE_MAPS_PRIVATE_KEY.replace(/\\n/g, '\n'), {
+    
+    // Correctly handles the Railway newline format
+    const privateKey = process.env.APPLE_MAPS_PRIVATE_KEY.replace(/\\n/g, '\n');
+
+    return jwt.sign(payload, privateKey, {
         algorithm: 'ES256',
-        header: { alg: 'ES256', kid: process.env.APPLE_MAPS_KEY_ID, typ: 'JWT' }
+        header: { 
+            alg: 'ES256', 
+            kid: "YZCFBAQQ4D", // Verified Key ID from Screenshot 1
+            typ: 'JWT' 
+        }
     });
 }
-
 // Logic: Charge the higher of Mileage total or Base Minimum total
 async function calculateDynamicQuote(vehicleType, pickupCoords, dropoffCoords) {
     const config = PRICING_CONFIG[vehicleType];
