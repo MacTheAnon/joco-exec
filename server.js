@@ -77,14 +77,19 @@ const saveUser = (u) => {
 // ==========================================
 
 // JWT Token for Frontend MapKit JS
+// JWT Token for Frontend MapKit JS
 app.get('/api/maps/token', (req, res) => {
     try {
+        // FIX: Dynamically grab the origin so it works on Localhost, Railway, AND Production
+        const requestOrigin = req.headers.origin || "https://www.jocoexec.com";
+
         const payload = {
             iss: process.env.APPLE_MAPS_TEAM_ID || "827CZWJ6A7", 
             iat: Math.floor(Date.now() / 1000),
             exp: Math.floor(Date.now() / 1000) + (1200),
-            origin: "https://www.jocoexec.com"
+            origin: requestOrigin // <--- This allows the token to work on the current domain
         };
+        
         const privateKey = (process.env.APPLE_MAPS_PRIVATE_KEY || "").replace(/\\n/g, '\n');
 
         const token = jwt.sign(payload, privateKey, {
@@ -93,32 +98,10 @@ app.get('/api/maps/token', (req, res) => {
         });
         res.json({ token });
     } catch (error) {
+        console.error("Map Token Error:", error);
         res.status(500).json({ error: "Token generation failed" });
     }
 });
-
-// Server-to-Server Token for Apple ETAs API
-async function getAppleMapsServerToken() {
-    const iat = Math.floor(Date.now() / 1000);
-    const payload = {
-        iss: process.env.APPLE_MAPS_TEAM_ID || "827CZWJ6A7",
-        sub: "maps.www.jocoexec.com",
-        iat: iat,
-        exp: iat + 900
-    };
-    
-    const privateKey = (process.env.APPLE_MAPS_PRIVATE_KEY || "").replace(/\\n/g, '\n');
-
-    return jwt.sign(payload, privateKey, {
-        algorithm: 'ES256',
-        header: { 
-            alg: 'ES256', 
-            kid: process.env.APPLE_MAPS_KEY_ID || "RFDK578343", 
-            typ: 'JWT' 
-        }
-    });
-}
-
 // Logic: Charge higher of Mileage total or Base Minimum total
 async function calculateDynamicQuote(vehicleType, pickupCoords, dropoffCoords) {
     const config = PRICING_CONFIG[vehicleType];
