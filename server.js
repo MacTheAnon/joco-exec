@@ -73,38 +73,40 @@ const saveUser = (u) => {
 };
 
 // ==========================================
-// 3. APPLE MAPS INTEGRATION (STATIC TOKENS)
+// 3. APPLE MAPS INTEGRATION (FINAL FIX)
 // ==========================================
 
-// These are the EXACT tokens from your uploaded CSV file.
-// They are pre-authorized and will not expire.
+// Valid tokens from your CSV
 const MAPS_TOKENS = {
-    // Token for jocoexec.com
+    // Live Production
+    "www.jocoexec.com": "eyJraWQiOiI2VTgySkZDNlhUIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg0NjQ4LCJvcmlnaW4iOiJ3d3cuam9jb2V4ZWMuY29tIn0.-gPvMZbjh6DKKeTbEZP0QRgaEkxfA1X1jcO3ZZPenAzhhOd9t_gsBzaOxnGGTUaPQkl-2XbxoNpKOva-B8ZRCw",
     "jocoexec.com": "eyJraWQiOiJZTDIyTEM2NlYyIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg0NjQ4LCJvcmlnaW4iOiJqb2NvZXhlYy5jb20ifQ.661L0KfLEy9eNS8BucF-ZIGSaILZc3JXnhFoP1SvvniHUcZVL2YiyRIXxboashR6rtnjnxoeD5ZhG9Itu8va4w",
     
-    // Token for www.jocoexec.com (Your Live Site)
-    "www.jocoexec.com": "eyJraWQiOiI2VTgySkZDNlhUIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg0NjQ4LCJvcmlnaW4iOiJ3d3cuam9jb2V4ZWMuY29tIn0.-gPvMZbjh6DKKeTbEZP0QRgaEkxfA1X1jcO3ZZPenAzhhOd9t_gsBzaOxnGGTUaPQkl-2XbxoNpKOva-B8ZRCw",
-    
-    // Token for Railway (Testing)
+    // Railway Deployment
     "joco-exec.up.railway.app": "eyJraWQiOiI2Njc5N0hUNlQ0IiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg0NjQ4LCJvcmlnaW4iOiJqb2NvLWV4ZWMudXAucmFpbHdheS5hcHAifQ.-MpV0iYJQyMKN5NmIB1JFJj6eQcoE0B114XN1dK11jcISly8JluOfKvJ98ia1vToRhvhmhj3SPhzJ7Z_XUTb9g",
     
-    // Wildcard Fallback (*.jocoexec.com)
+    // Wildcard Fallback (Use for anything else)
     "default": "eyJraWQiOiJTVDZIRzI5SDJBIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg2NTA3LCJvcmlnaW4iOiIqLmpvY29leGVjLmNvbSJ9.in54tp2O2ZteVBOVkY2jUExdZ4o691DKx_UsMTlRU5XVeZOg8br4XCMDYsF_NrK8le2elwOGSHTh6dnEBJl2_A"
 };
 
 // Route: Frontend Token Request
 app.get('/api/maps/token', (req, res) => {
     try {
-        // 1. Get the request origin and clean it (remove https://)
         let origin = req.headers.origin || "";
-        origin = origin.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        
+        // Debug Log: Check what origin is actually coming in
+        console.log(`[DEBUG] Request Origin: ${origin}`);
 
-        // 2. Select the correct token from your pre-authorized list
-        let token = MAPS_TOKENS[origin];
+        // Clean the origin (remove https://) to match CSV keys
+        const cleanOrigin = origin.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        console.log(`[DEBUG] Cleaned Origin: ${cleanOrigin}`);
 
-        // 3. Fallback to the wildcard token if the specific domain isn't found
+        // Select Token
+        let token = MAPS_TOKENS[cleanOrigin];
+
+        // If testing on Localhost or unknown domain, use Wildcard
         if (!token) {
-            console.log(`Using default wildcard token for origin: ${origin}`);
+            console.log(`[WARN] No direct match. Using Wildcard Token.`);
             token = MAPS_TOKENS["default"];
         }
 
@@ -117,7 +119,7 @@ app.get('/api/maps/token', (req, res) => {
 
 // Helper: For Server-Side Quote Calculation
 const getAppleMapsServerToken = async () => {
-    // Use the main website token for server-side calculations
+    // We use the 'www' token for server-side calls
     return MAPS_TOKENS["www.jocoexec.com"];
 };
 
@@ -130,7 +132,14 @@ async function calculateDynamicQuote(vehicleType, pickupCoords, dropoffCoords) {
         const serverToken = await getAppleMapsServerToken();
         const url = `https://maps-api.apple.com/v1/etas?origin=${pickupCoords.latitude},${pickupCoords.longitude}&destinations=${dropoffCoords.latitude},${dropoffCoords.longitude}&transportType=Automobile`;
         
-        const response = await axios.get(url, { headers: { 'Authorization': `Bearer ${serverToken}` } });
+        // FIX: Add 'Origin' header to spoof the website request.
+        // Server-side calls have no origin by default, so Apple rejects MapKit tokens without this.
+        const response = await axios.get(url, { 
+            headers: { 
+                'Authorization': `Bearer ${serverToken}`,
+                'Origin': 'https://www.jocoexec.com' 
+            } 
+        });
         
         if (!response.data.etas || response.data.etas.length === 0) throw new Error("No route found");
 
@@ -138,7 +147,6 @@ async function calculateDynamicQuote(vehicleType, pickupCoords, dropoffCoords) {
         const distanceInMiles = distanceMeters / 1609.34;
         const mileageTotal = distanceInMiles * config.perMileRate;
         
-        // Return higher of Mileage or Base Minimum
         const finalQuote = Math.max(config.baseRate, mileageTotal);
 
         return {

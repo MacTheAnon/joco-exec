@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Map, Marker } from 'mapkit-react';
+
 const KC_REGION = {
   centerLatitude: 38.8814,
   centerLongitude: -94.8191,
   latitudeDelta: 0.5,
   longitudeDelta: 0.5
 };
+
 const BookingForm = ({ onSubmit }) => {
   // --- 1. STATE MANAGEMENT ---
   const [formData, setFormData] = useState({
@@ -14,30 +16,22 @@ const BookingForm = ({ onSubmit }) => {
     meetAndGreet: false, passengers: '1', vehicleType: 'Luxury Sedan' 
   });
 
-  // HARD-CODED FRONTEND TOKEN
-  // Inside BookingForm component
-const [mapToken, setMapToken] = useState("");
-
-useEffect(() => {
-    // Fetch fresh token on load
-    fetch('/api/maps/token')
-        .then(res => res.json())
-        .then(data => setMapToken(data.token))
-        .catch(err => console.error("Could not load MapKit token"));
-}, []);
-
-// Update the Map component to use the dynamic state
-<Map token={mapToken}>
-    <Marker latitude={38.8814} longitude={-94.8191} title="JOCO EXEC" />
-</Map>
-  
+  // MAP TOKEN STATE (Fixed placement)
+  const [mapToken, setMapToken] = useState("");
   const [checking, setChecking] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 600);
   const [pickupResults, setPickupResults] = useState([]);
   const [dropoffResults, setDropoffResults] = useState([]);
 
-  // --- 2. LIFECYCLE & RESIZE HANDLING ---
+  // --- 2. LIFECYCLE: FETCH TOKEN & HANDLE RESIZE ---
   useEffect(() => {
+    // 1. Fetch the secure MapKit token from your backend
+    fetch('/api/maps/token')
+      .then(res => res.json())
+      .then(data => setMapToken(data.token))
+      .catch(err => console.error("Could not load MapKit token"));
+
+    // 2. Window Resize Listener
     const handleResize = () => setIsMobile(window.innerWidth < 600);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -45,14 +39,23 @@ useEffect(() => {
 
   // --- 3. APPLE MAPS SEARCH LOGIC ---
   const handleAddressSearch = (query, setResults) => {
+    // Ensure MapKit is loaded and query is long enough
     if (!window.mapkit || query.length < 3) return;
+    
     const region = new window.mapkit.CoordinateRegion(
       new window.mapkit.Coordinate(38.8814, -94.8191),
       new window.mapkit.CoordinateSpan(0.5, 0.5)
     );
+    
     const search = new window.mapkit.Search({ region });
+    
     search.autocomplete(query, (error, data) => {
-      if (!error) setResults(data.results);
+      if (!error) {
+        setResults(data.results);
+      } else {
+        // If 401 happens here, it's because the domain (localhost) isn't whitelisted
+        console.warn("Autocomplete Error (Check Domain Whitelist):", error);
+      }
     });
   };
 
@@ -112,9 +115,13 @@ useEffect(() => {
       <div style={{ textAlign: 'center', marginBottom: '25px' }}>
         <h2 style={headerTitleStyle}>Request a Ride</h2>
         <div style={mapBoxStyle}>
-          <Map token={mapToken}>
-            <Marker latitude={38.8814} longitude={-94.8191} title="JOCO EXEC" />
-          </Map>
+          {/* Only render Map if we have a token to prevent errors */}
+          {mapToken && (
+            <Map token={mapToken}>
+              <Marker latitude={38.8814} longitude={-94.8191} title="JOCO EXEC" />
+            </Map>
+          )}
+          {!mapToken && <div style={{padding:'20px', color:'#666'}}>Loading Map...</div>}
         </div>
       </div>
       
