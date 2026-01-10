@@ -73,40 +73,56 @@ const saveUser = (u) => {
 };
 
 // ==========================================
-// 3. APPLE MAPS INTEGRATION
+// 3. APPLE MAPS INTEGRATION (FIXED)
 // ==========================================
 
-// JWT Token for Frontend MapKit JS
-// JWT Token for Frontend MapKit JS
-// ==========================================
-// 3. APPLE MAPS INTEGRATION
-// ==========================================
+/**
+ * Helper to generate a valid MapKit JS Token.
+ * Handles origin cleaning and timestamp leeway.
+ */
+const generateMapToken = (requestOrigin) => {
+    // 1. Clean the origin: Remove "https://" and trailing slashes
+    // This creates the EXACT match Apple requires for the whitelist
+    const cleanOrigin = (requestOrigin || "www.jocoexec.com").replace(/^https?:\/\//, '').replace(/\/$/, '');
 
+    const payload = {
+        iss: process.env.APPLE_MAPS_TEAM_ID || "827CZWJ6A7", 
+        iat: Math.floor(Date.now() / 1000) - 30, // 30-second leeway to prevent "Not Before" errors
+        exp: Math.floor(Date.now() / 1000) + 1200, // Expires in 20 mins
+        origin: cleanOrigin
+    };
+    
+    // Ensure newlines are handled correctly in the private key from Env Vars
+    const privateKey = (process.env.APPLE_MAPS_PRIVATE_KEY || "").replace(/\\n/g, '\n');
+
+    return jwt.sign(payload, privateKey, {
+        algorithm: 'ES256',
+        header: { 
+            alg: 'ES256', 
+            typ: 'JWT', 
+            kid: process.env.APPLE_MAPS_KEY_ID || "RFDK578343" 
+        }
+    });
+};
+
+// Route: Frontend Token Request
 app.get('/api/maps/token', (req, res) => {
     try {
-        // FIX: Remove the hardcoded fallback and let it be dynamic
-        const requestOrigin = req.headers.origin; 
-
-        const payload = {
-            iss: process.env.APPLE_MAPS_TEAM_ID || "827CZWJ6A7", 
-            iat: Math.floor(Date.now() / 1000),
-            exp: Math.floor(Date.now() / 1000) + (1200),
-            origin: requestOrigin // This MUST match the domain in your browser
-        };
-        
-        // ... rest of your code
-        const privateKey = (process.env.APPLE_MAPS_PRIVATE_KEY || "").replace(/\\n/g, '\n');
-
-        const token = jwt.sign(payload, privateKey, {
-            algorithm: 'ES256',
-            header: { alg: 'ES256', typ: 'JWT', kid: process.env.APPLE_MAPS_KEY_ID || "RFDK578343" }
-        });
+        // Pass the browser's origin header to the generator
+        const token = generateMapToken(req.headers.origin);
         res.json({ token });
     } catch (error) {
         console.error("Map Token Error:", error);
         res.status(500).json({ error: "Token generation failed" });
     }
 });
+
+// Helper: For Server-Side Quote Calculation
+const getAppleMapsServerToken = async () => {
+    // For server-side requests, we act as the main domain
+    return generateMapToken("www.jocoexec.com");
+};
+
 // Logic: Charge higher of Mileage total or Base Minimum total
 async function calculateDynamicQuote(vehicleType, pickupCoords, dropoffCoords) {
     const config = PRICING_CONFIG[vehicleType];
@@ -278,15 +294,13 @@ if (fs.existsSync(clientBuildPath)) {
 }
 
 // 2. API 404 Handler - Important!
-// FIX: "app.use('/api', ...)" matches anything starting with /api that wasn't handled above
-// We REMOVED the "/*" wildcard to prevent crashes.
+// Matches anything starting with /api that wasn't handled above
 app.use('/api', (req, res) => {
     res.status(404).json({ error: "API route not found" });
 });
 
-// 3. React Router Catch-All (FIXED)
-// FIX: "app.use(...)" with no path matches EVERYTHING else (i.e. frontend routes)
-// We REMOVED the "*" wildcard to prevent crashes.
+// 3. React Router Catch-All
+// Matches EVERYTHING else (i.e. frontend routes)
 app.use((req, res) => {
     const target = fs.existsSync(clientBuildPath) ? clientBuildPath : rootBuildPath;
     res.sendFile(path.join(target, 'index.html'));
