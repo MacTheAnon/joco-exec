@@ -48,6 +48,8 @@ const transporter = nodemailer.createTransport({
     auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
 });
 
+const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_TOKEN);
+
 // ==========================================
 // 2. DATA UTILITIES
 // ==========================================
@@ -94,28 +96,7 @@ app.get('/api/maps/token', (req, res) => {
     }
 });
 
-// Calculate distance using Apple Maps Server-Side API
-const jwt = require('jsonwebtoken');
-const axios = require('axios');
-
-// Route to generate a MapKit JS token for the frontend
-app.get('/api/maps/token', (req, res) => {
-    try {
-        const payload = {
-            iss: process.env.APPLE_MAPS_TEAM_ID, 
-            iat: Math.floor(Date.now() / 1000),
-            exp: Math.floor(Date.now() / 1000) + (1800), 
-            origin: "https://www.jocoexec.com"
-        };
-        const token = jwt.sign(payload, process.env.APPLE_MAPS_PRIVATE_KEY.replace(/\\n/g, '\n'), {
-            algorithm: 'ES256',
-            header: { alg: 'ES256', typ: 'JWT', kid: process.env.APPLE_MAPS_KEY_ID }
-        });
-        res.json({ token });
-    } catch (error) { res.status(500).json({ error: "Token generation failed" }); }
-});
-
-// Function to get an Apple Maps Server-to-Server token
+// Server-to-Server Token for Apple ETAs API
 async function getAppleMapsServerToken() {
     const payload = {
         iss: process.env.APPLE_MAPS_TEAM_ID,
@@ -128,43 +109,35 @@ async function getAppleMapsServerToken() {
     });
 }
 
-// Calculate driving distance using Apple's ETAs API
-// Calculate driving distance using Apple's ETAs API
+// Pricing Logic: Charge higher of Mileage vs Minimum Base
 async function calculateDynamicQuote(vehicleType, pickupCoords, dropoffCoords) {
     const config = PRICING_CONFIG[vehicleType];
     if (!config) throw new Error(`Pricing not configured for: ${vehicleType}`);
 
     const serverToken = await getAppleMapsServerToken();
-    
     try {
         const url = `https://maps-api.apple.com/v1/etas?origin=${pickupCoords.latitude},${pickupCoords.longitude}&destinations=${dropoffCoords.latitude},${dropoffCoords.longitude}&transportType=Automobile`;
         const response = await axios.get(url, { headers: { 'Authorization': `Bearer ${serverToken}` } });
         
-        // Apple returns distance in meters
         const distanceMeters = response.data.etas[0].distanceMeters; 
         const distanceInMiles = distanceMeters / 1609.34;
-        
-        // MATH LOGIC:
-        // Calculate the mileage-based total
         const mileageTotal = distanceInMiles * config.perMileRate;
         
-        // IF mileage total is MORE than base minimum, charge mileageTotal. 
-        // IF mileage total is LESS than base minimum, charge baseRate.
+        // Return higher of Mileage or Base Minimum
         const finalQuote = Math.max(config.baseRate, mileageTotal);
 
         return {
             quote: parseFloat(finalQuote.toFixed(2)),
             distance: distanceInMiles.toFixed(2),
-            method: mileageTotal > config.baseRate ? "Mileage Rate Applied" : "Minimum Base Rate Applied"
+            method: mileageTotal > config.baseRate ? "Mileage Rate" : "Base Rate"
         };
     } catch (error) { 
-        console.error("Distance API Error:", error.message);
-        // Fallback to base minimum if the API fails
-        return { quote: config.baseRate, error: "Calculation failed, using minimum." }; 
+        return { quote: config.baseRate, error: "Distance calculation failed" }; 
     }
 }
+
 // ==========================================
-// 4. API ROUTES (FULL SET)
+// 4. API ROUTES
 // ==========================================
 
 app.post('/api/check-availability', (req, res) => {
@@ -192,8 +165,8 @@ app.post('/api/auth/login', async (req, res) => {
     const ADMIN_PASS = process.env.ADMIN_SECRET || 'JoC03x3c2026';
 
     if ((identifier === 'kalebm.lord@gmail.com' || identifier === 'admin') && password === ADMIN_PASS) {
-        const token = jwt.sign({ id: 'master-admin', email: 'admin', role: 'admin' }, SECRET_KEY, { expiresIn: '1d' });
-        return res.json({ token, user: { name: 'Master Admin', role: 'admin', email: 'admin@internal', isApproved: true } });
+        const token = jwt.sign({ id: 'master-admin', role: 'admin' }, SECRET_KEY, { expiresIn: '1d' });
+        return res.json({ token, user: { name: 'Master Admin', role: 'admin', isApproved: true } });
     }
 
     const user = getUsers().find(u => u.email === identifier || u.username === identifier);
@@ -206,32 +179,30 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 app.post('/api/auth/register', async (req, res) => {
-    const { name, username, email, password, role, companyName } = req.body;
-    if (role === 'admin') return res.status(403).json({ error: "Restricted." });
-
+    const { name, username, email, password, role } = req.body;
     const users = getUsers();
     if (users.find(u => u.email === email || u.username === username)) {
-        return res.status(400).json({ error: "Already exists." });
+        return res.status(400).json({ error: "User already exists." });
     }
     
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = { 
         id: Date.now().toString(), 
-        name, username, email, companyName: companyName || null,
+        name, username, email,
         password: hashedPassword, role: role || 'customer',
-        isApproved: role === 'driver' ? false : true 
+        isApproved: role !== 'driver' 
     };
     
     saveUser(newUser);
-    const token = jwt.sign({ id: newUser.id, email: newUser.email, role: newUser.role }, SECRET_KEY, { expiresIn: '1d' });
-    res.json({ success: true, token, user: { name: newUser.name, role: newUser.role, email: newUser.email, isApproved: newUser.isApproved } });
+    const token = jwt.sign({ id: newUser.id, role: newUser.role }, SECRET_KEY, { expiresIn: '1d' });
+    res.json({ success: true, token, user: { name: newUser.name, role: newUser.role, isApproved: newUser.isApproved } });
 });
 
 app.post('/api/process-payment', async (req, res) => {
     const { sourceId, vehicleType, pickup, dropoff, bookingDetails } = req.body;
     try {
-        let pricingResult = await calculateDynamicQuote(vehicleType, pickup, dropoff);
-        let amountInCents = BigInt(Math.round(pricingResult.quote * 100));
+        let pricing = await calculateDynamicQuote(vehicleType, pickup, dropoff);
+        let amountInCents = BigInt(Math.round(pricing.quote * 100));
 
         if (bookingDetails && bookingDetails.meetAndGreet) {
             amountInCents += BigInt(2500); 
@@ -251,17 +222,24 @@ app.post('/api/process-payment', async (req, res) => {
         saveBooking(newBooking);
         
         // --- DRIVER NOTIFICATIONS (TWILIO & EMAIL) ---
-        const approvedDrivers = getUsers().filter(u => u.role === 'driver' && u.isApproved);
-        approvedDrivers.forEach(async (driver) => {
-            // Email Notification
+        const drivers = getUsers().filter(u => u.role === 'driver' && u.isApproved);
+        drivers.forEach(async (driver) => {
+            // Email Chauffeur
             transporter.sendMail({
                 from: `"JOCO EXEC" <${process.env.EMAIL_USER}>`, 
                 to: driver.email,
-                subject: `NEW JOB AVAILABLE: ${newBooking.date}`,
-                html: `<p>New Job: ${pickup} to ${dropoff}</p>`
+                subject: `NEW JOB: ${newBooking.date}`,
+                html: `<p>New Job Available: ${newBooking.pickup} to ${newBooking.dropoff}</p>`
             }).catch(e => console.error("Email Error:", e.message));
 
-            // Optional Twilio Logic could be placed here
+            // Twilio SMS Chauffeur
+            if (process.env.TWILIO_PHONE) {
+                twilioClient.messages.create({
+                    body: `JOCO EXEC: New job on ${newBooking.date} from ${newBooking.pickup}.`,
+                    from: process.env.TWILIO_PHONE,
+                    to: driver.phone || process.env.DRIVER_EMAILS.split(',')[0]
+                }).catch(e => console.error("SMS Error:", e.message));
+            }
         });
 
         res.json({ success: true, paymentId: response.result.payment.id });
@@ -280,10 +258,7 @@ app.get('/api/admin/users', (req, res) => res.json(getUsers()));
 app.post('/api/admin/approve-driver', (req, res) => {
     const { email } = req.body;
     const users = getUsers();
-    const updatedUsers = users.map(u => {
-        if (u.email === email && u.role === 'driver') return { ...u, isApproved: true };
-        return u;
-    });
+    const updatedUsers = users.map(u => (u.email === email && u.role === 'driver') ? { ...u, isApproved: true } : u);
     fs.writeFileSync(USERS_FILE, JSON.stringify(updatedUsers, null, 2));
     res.json({ success: true });
 });
