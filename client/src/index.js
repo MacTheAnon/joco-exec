@@ -4,8 +4,4 @@ import './App.css';
 import App from './App';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+root.render(<App />); // Removed StrictMode to prevent double-rendering during debugging

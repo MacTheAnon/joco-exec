@@ -34,7 +34,7 @@
       "last 1 firefox version"
     ]
   },
- "overrides": {
+  "overrides": {
     "react": "$react",
     "react-dom": "$react-dom"
   }

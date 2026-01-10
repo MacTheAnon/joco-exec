@@ -4,7 +4,6 @@
 const { SquareClient, SquareEnvironment } = require('square');
 const express = require('express');
 const cors = require('cors');
-const helmet = require('helmet'); 
 const path = require('path');
 const fs = require('fs');
 const nodemailer = require('nodemailer');
@@ -50,19 +49,7 @@ const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
 });
-
 // ==========================================
-// 3. MIDDLEWARE SETUP (✅ FIXED SECURITY RULES)
-// ==========================================
-// Keep Helmet for basic security, but turn off the strict blocking rules (CSP)
-app.use(helmet({
-  contentSecurityPolicy: false,
-  crossOriginEmbedderPolicy: false,
-}));
-// ==========================================
-// 4. HELPER FUNCTIONS
-// ==========================================
-
 const getBookings = () => {
     if (!fs.existsSync(DB_FILE)) fs.writeFileSync(DB_FILE, '[]');
     return JSON.parse(fs.readFileSync(DB_FILE, 'utf8') || '[]');
