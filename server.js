@@ -109,7 +109,7 @@ async function getAppleMapsServerToken() {
     const payload = {
         iss: "827CZWJ6A7", 
         iat: iat,
-        exp: iat + 900 // 15 mins - Mandatory for ETAs API
+        exp: iat + 900 // Exactly 15 mins - Mandatory for Apple Server APIs
     };
     
     const privateKey = `-----BEGIN PRIVATE KEY-----
