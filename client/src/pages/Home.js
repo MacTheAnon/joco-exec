@@ -1,10 +1,16 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Shield, Clock, MapPin, Award, Music, CreditCard } from 'lucide-react';
+import { Shield, Clock, Award } from 'lucide-react';
 
 const Home = () => {
+  // ✅ STATE FOR RESPONSIVE DESIGN
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
   useEffect(() => {
     window.scrollTo(0, 0);
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const scrollToRates = (e) => {
@@ -12,6 +18,14 @@ const Home = () => {
     const element = document.getElementById('rates');
     if (element) element.scrollIntoView({ behavior: 'smooth' });
   };
+
+  // ✅ DYNAMIC STYLES (Moved inside component so they update)
+  const heroTitleStyle = { fontSize: isMobile ? '1.8rem' : '3rem', lineHeight: '1.2' };
+  const heroSubtitleStyle = { fontSize: isMobile ? '1rem' : '1.2rem', margin: '20px 0' };
+  const heroBtnContainer = { marginTop: '30px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '15px', alignItems: 'center', justifyContent: 'center' };
+  const mobileFullWidthBtn = { width: isMobile ? '100%' : 'auto', textAlign: 'center' };
+  const mobileOutlineBtn = { ...mobileFullWidthBtn, background: 'transparent', fontSize: '1rem', cursor: 'pointer', fontFamily: 'inherit', border: '2px solid #fff', color: '#fff', padding: '12px 30px', borderRadius: '4px' };
+  const featuresGridStyle = { display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'center', alignItems: 'center', gap: '40px', maxWidth: '1200px', margin: '0 auto' };
 
   return (
     <div>
@@ -87,13 +101,7 @@ const Home = () => {
   );
 };
 
-// --- STYLES ---
-const heroTitleStyle = { fontSize: window.innerWidth < 768 ? '1.8rem' : '3rem', lineHeight: '1.2' };
-const heroSubtitleStyle = { fontSize: window.innerWidth < 768 ? '1rem' : '1.2rem', margin: '20px 0' };
-const heroBtnContainer = { marginTop: '30px', display: 'flex', flexDirection: window.innerWidth < 768 ? 'column' : 'row', gap: '15px', alignItems: 'center', justifyContent: 'center' };
-const mobileFullWidthBtn = { width: window.innerWidth < 768 ? '100%' : 'auto', textAlign: 'center' };
-const mobileOutlineBtn = { ...mobileFullWidthBtn, background: 'transparent', fontSize: '1rem', cursor: 'pointer', fontFamily: 'inherit', border: '2px solid #fff', color: '#fff', padding: '12px 30px', borderRadius: '4px' };
-const featuresGridStyle = { display: 'flex', flexDirection: window.innerWidth < 768 ? 'column' : 'row', justifyContent: 'center', alignItems: 'center', gap: '40px', maxWidth: '1200px', margin: '0 auto' };
+// --- STATIC STYLES ---
 const featureItemStyle = { maxWidth: '280px', textAlign: 'center' };
 const featureSubtextStyle = { fontSize: '0.9rem', color: '#999', marginTop: '10px' };
 const popularBadgeStyle = { background: '#C5A059', color: '#000', fontSize: '0.75rem', fontWeight: 'bold', padding: '5px 10px', borderRadius: '4px', marginBottom: '10px', display: 'inline-block' };
