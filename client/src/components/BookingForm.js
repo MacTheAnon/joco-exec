@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Autocomplete from 'react-google-autocomplete'; // ✅ REQUIRED FOR MAPS
+import { usePlacesWidget } from 'react-google-autocomplete'; // ✅ Switched to Hook for stability
 
 const BookingForm = ({ onSubmit }) => {
   // --- STATE MANAGEMENT ---
@@ -25,6 +25,32 @@ const BookingForm = ({ onSubmit }) => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // --- GOOGLE MAPS HOOKS (Fixes the Ref/Crash Error) ---
+  
+  // 1. Pickup Ref
+  const { ref: pickupRef } = usePlacesWidget({
+    apiKey: process.env.REACT_APP_GOOGLE_MAPS_KEY,
+    onPlaceSelected: (place) => {
+      setFormData((prev) => ({ ...prev, pickup: place.formatted_address || place.name }));
+    },
+    options: {
+      types: ['geocode', 'establishment'],
+      componentRestrictions: { country: "us" },
+    },
+  });
+
+  // 2. Dropoff Ref
+  const { ref: dropoffRef } = usePlacesWidget({
+    apiKey: process.env.REACT_APP_GOOGLE_MAPS_KEY,
+    onPlaceSelected: (place) => {
+      setFormData((prev) => ({ ...prev, dropoff: place.formatted_address || place.name }));
+    },
+    options: {
+      types: ['geocode', 'establishment'],
+      componentRestrictions: { country: "us" },
+    },
+  });
 
   // --- HANDLERS ---
   const handleChange = (e) => {
@@ -86,7 +112,7 @@ const BookingForm = ({ onSubmit }) => {
 
     } catch (err) {
       console.error(err);
-      alert("Error fetching quote. Please check your network connection or address validity.");
+      alert("Error fetching quote. Please check address validity.");
     } finally {
       setChecking(false);
     }
@@ -141,7 +167,7 @@ const BookingForm = ({ onSubmit }) => {
            </div>
         </div>
 
-        {/* ✅ UPDATED VEHICLE SELECTION: Sedan, SUV, and Night Out */}
+        {/* Vehicle Selection */}
         <div style={inputGroupStyle}>
             <label style={labelStyle}>Select Service / Vehicle</label>
             <select 
@@ -180,18 +206,12 @@ const BookingForm = ({ onSubmit }) => {
           </div>
         </div>
 
-        {/* ✅ PICKUP: GOOGLE AUTOCOMPLETE (Required for Mileage) */}
+        {/* ✅ PICKUP: FIXED GOOGLE INPUT */}
         <div style={inputGroupStyle}>
             <label style={labelStyle}>Pickup Location</label>
-            <Autocomplete
-                apiKey={process.env.REACT_APP_GOOGLE_MAPS_KEY}
-                onPlaceSelected={(place) => {
-                    setFormData(prev => ({ ...prev, pickup: place.formatted_address || place.name }));
-                }}
-                options={{
-                    types: ['geocode', 'establishment'],
-                    componentRestrictions: { country: "us" },
-                }}
+            <input
+                ref={pickupRef}
+                type="text"
                 style={inputStyle}
                 placeholder="Start typing address..."
                 required
@@ -200,18 +220,12 @@ const BookingForm = ({ onSubmit }) => {
             />
         </div>
 
-        {/* ✅ DROPOFF: GOOGLE AUTOCOMPLETE (Required for Mileage) */}
+        {/* ✅ DROPOFF: FIXED GOOGLE INPUT */}
         <div style={inputGroupStyle}>
             <label style={labelStyle}>Dropoff Location</label>
-            <Autocomplete
-                apiKey={process.env.REACT_APP_GOOGLE_MAPS_KEY}
-                onPlaceSelected={(place) => {
-                    setFormData(prev => ({ ...prev, dropoff: place.formatted_address || place.name }));
-                }}
-                options={{
-                    types: ['geocode', 'establishment'],
-                    componentRestrictions: { country: "us" },
-                }}
+            <input
+                ref={dropoffRef}
+                type="text"
                 style={inputStyle}
                 placeholder="Start typing destination..."
                 required
