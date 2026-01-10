@@ -73,19 +73,22 @@ const saveUser = (u) => {
 };
 
 // ==========================================
-// 3. APPLE MAPS INTEGRATION (STATIC TOKEN FIX)
+// 3. APPLE MAPS INTEGRATION (STATIC TOKENS)
 // ==========================================
 
-// These are the valid, non-expiring tokens from your CSV file.
-// We serve these directly to bypass the Private Key configuration issues.
+// These are the EXACT tokens from your uploaded CSV file.
+// They are pre-authorized and will not expire.
 const MAPS_TOKENS = {
-    // For your live website
+    // Token for jocoexec.com
+    "jocoexec.com": "eyJraWQiOiJZTDIyTEM2NlYyIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg0NjQ4LCJvcmlnaW4iOiJqb2NvZXhlYy5jb20ifQ.661L0KfLEy9eNS8BucF-ZIGSaILZc3JXnhFoP1SvvniHUcZVL2YiyRIXxboashR6rtnjnxoeD5ZhG9Itu8va4w",
+    
+    // Token for www.jocoexec.com (Your Live Site)
     "www.jocoexec.com": "eyJraWQiOiI2VTgySkZDNlhUIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg0NjQ4LCJvcmlnaW4iOiJ3d3cuam9jb2V4ZWMuY29tIn0.-gPvMZbjh6DKKeTbEZP0QRgaEkxfA1X1jcO3ZZPenAzhhOd9t_gsBzaOxnGGTUaPQkl-2XbxoNpKOva-B8ZRCw",
     
-    // For your Railway testing site
+    // Token for Railway (Testing)
     "joco-exec.up.railway.app": "eyJraWQiOiI2Njc5N0hUNlQ0IiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg0NjQ4LCJvcmlnaW4iOiJqb2NvLWV4ZWMudXAucmFpbHdheS5hcHAifQ.-MpV0iYJQyMKN5NmIB1JFJj6eQcoE0B114XN1dK11jcISly8JluOfKvJ98ia1vToRhvhmhj3SPhzJ7Z_XUTb9g",
     
-    // Fallback / Wildcard for any other subdomain
+    // Wildcard Fallback (*.jocoexec.com)
     "default": "eyJraWQiOiJTVDZIRzI5SDJBIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg2NTA3LCJvcmlnaW4iOiIqLmpvY29leGVjLmNvbSJ9.in54tp2O2ZteVBOVkY2jUExdZ4o691DKx_UsMTlRU5XVeZOg8br4XCMDYsF_NrK8le2elwOGSHTh6dnEBJl2_A"
 };
 
