@@ -13,7 +13,7 @@ const BookingForm = ({ onSubmit }) => {
   const [checking, setChecking] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 600);
   
-  // Autocomplete Suggestion States
+  // Autocomplete Result States
   const [pickupResults, setPickupResults] = useState([]);
   const [dropoffResults, setDropoffResults] = useState([]);
 
@@ -21,7 +21,6 @@ const BookingForm = ({ onSubmit }) => {
     const handleResize = () => setIsMobile(window.innerWidth < 600);
     window.addEventListener('resize', handleResize);
     
-    // Fetch Apple Maps Token from your server
     fetch('/api/maps/token')
       .then(res => res.json())
       .then(data => setMapToken(data.token));
@@ -32,7 +31,6 @@ const BookingForm = ({ onSubmit }) => {
   // --- APPLE MAPS SEARCH LOGIC ---
   const handleAddressSearch = (query, setResults) => {
     if (!window.mapkit || query.length < 3) return;
-    // Bias search toward Kansas City area for accuracy
     const region = new window.mapkit.CoordinateRegion(
       new window.mapkit.Coordinate(38.8814, -94.8191),
       new window.mapkit.CoordinateSpan(0.5, 0.5)
@@ -47,12 +45,11 @@ const BookingForm = ({ onSubmit }) => {
     setFormData({ 
       ...formData, 
       [field]: result.displayLines.join(', '),
-      [`${field}Coords`]: result.coordinate // Critical: Stores Lat/Lng for distance API
+      [`${field}Coords`]: result.coordinate // Stores Lat/Lng for distance API
     });
     setResults([]); 
   };
 
-  // --- HANDLERS ---
   const handleChange = (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     setFormData({ ...formData, [e.target.name]: value });
@@ -130,8 +127,8 @@ const BookingForm = ({ onSubmit }) => {
         <div style={inputGroupStyle}>
             <label style={labelStyle}>Vehicle Type</label>
             <select name="vehicleType" style={inputStyle} onChange={handleChange} value={formData.vehicleType}>
-                <option value="Luxury Sedan">Luxury Sedan (Base $85)</option>
-                <option value="Luxury SUV">Executive SUV (Base $95)</option>
+                <option value="Luxury Sedan">Luxury Sedan (Base $85 or $3/mile)</option>
+                <option value="Luxury SUV">Executive SUV (Base $95 or $4.50/mile)</option>
                 <option value="Night Out">Night Out (Starts $150)</option>
             </select>
         </div>
@@ -141,7 +138,6 @@ const BookingForm = ({ onSubmit }) => {
           <div style={{ flex: 1 }}><label style={labelStyle}>Time</label><input type="time" name="time" style={inputStyle} onChange={handleChange} required /></div>
         </div>
 
-        {/* --- PICKUP AUTOCOMPLETE --- */}
         <div style={inputGroupStyle}>
             <label style={labelStyle}>Pickup Location</label>
             <input 
@@ -166,7 +162,6 @@ const BookingForm = ({ onSubmit }) => {
             )}
         </div>
 
-        {/* --- DROPOFF AUTOCOMPLETE --- */}
         <div style={inputGroupStyle}>
             <label style={labelStyle}>Dropoff Destination</label>
             <input 
@@ -206,7 +201,7 @@ const BookingForm = ({ onSubmit }) => {
   );
 };
 
-// --- STYLES (100% Preserved with Search Dropdown Support) ---
+// --- STYLES (100% Preserved) ---
 const formCardStyle = { background: '#111', border: '1px solid #C5A059', padding: '35px', borderRadius: '12px', maxWidth: '550px', width: '100%', margin: '0 auto', color: '#fff', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', boxSizing: 'border-box', position: 'relative'};
 const dropdownStyle = { position: 'absolute', zIndex: 1000, background: '#000', border: '1px solid #C5A059', borderRadius: '4px', width: '90%', marginTop: '-15px' };
 const dropdownItemStyle = { padding: '12px', cursor: 'pointer', borderBottom: '1px solid #222', fontSize: '0.9rem', color: '#fff' };
