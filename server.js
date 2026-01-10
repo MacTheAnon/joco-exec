@@ -74,21 +74,28 @@ const saveUser = (u) => {
 };
 
 // ==========================================
-// 3. APPLE MAPS INTEGRATION
+// 3. APPLE MAPS INTEGRATION (HARD-CODED)
 // ==========================================
 
 // JWT Token for Frontend MapKit JS
 app.get('/api/maps/token', (req, res) => {
     try {
         const payload = {
-            iss: process.env.APPLE_MAPS_TEAM_ID, 
+            iss: "827CZWJ6A7", 
             iat: Math.floor(Date.now() / 1000),
             exp: Math.floor(Date.now() / 1000) + (1200), // Max 20 mins
             origin: "https://www.jocoexec.com"
         };
-        const token = jwt.sign(payload, process.env.APPLE_MAPS_PRIVATE_KEY.replace(/\\n/g, '\n'), {
+        const privateKey = `-----BEGIN PRIVATE KEY-----
+MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgT/gaa0qsbStKaEcS
+VgNkBbHV197Kydf7Orjh7P80csegCgYIKoZIzj0DAQehRANCAATDhmeeNEQlZ9mu
+4e1JIhETTgchP26WL0kS/gc862qe34TX1voIy11l8rw911JqoZXKUuFRd3hUVDd1
+Acztskgr
+-----END PRIVATE KEY-----`;
+
+        const token = jwt.sign(payload, privateKey, {
             algorithm: 'ES256',
-            header: { alg: 'ES256', typ: 'JWT', kid: process.env.APPLE_MAPS_KEY_ID }
+            header: { alg: 'ES256', typ: 'JWT', kid: "YZCFBAQQ4D" }
         });
         res.json({ token });
     } catch (error) {
@@ -96,28 +103,33 @@ app.get('/api/maps/token', (req, res) => {
     }
 });
 
-// Server-to-Server Token for Apple ETAs API (Fixes 401 error with short expiry)
+// Server-to-Server Token for Apple ETAs API (Fixes 401 error)
 async function getAppleMapsServerToken() {
     const iat = Math.floor(Date.now() / 1000);
     const payload = {
-        iss: "827CZWJ6A7", // Verified Team ID from Screenshot 1
+        iss: "827CZWJ6A7", 
         iat: iat,
-        exp: iat + 900,   // 15 minutes (Must be < 20 for Apple Server API)
+        exp: iat + 900 // 15 mins - Mandatory for ETAs API
     };
     
-    // Correctly handles the Railway newline format
-    const privateKey = process.env.APPLE_MAPS_PRIVATE_KEY.replace(/\\n/g, '\n');
+    const privateKey = `-----BEGIN PRIVATE KEY-----
+MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgT/gaa0qsbStKaEcS
+VgNkBbHV197Kydf7Orjh7P80csegCgYIKoZIzj0DAQehRANCAATDhmeeNEQlZ9mu
+4e1JIhETTgchP26WL0kS/gc862qe34TX1voIy11l8rw911JqoZXKUuFRd3hUVDd1
+Acztskgr
+-----END PRIVATE KEY-----`;
 
     return jwt.sign(payload, privateKey, {
         algorithm: 'ES256',
         header: { 
             alg: 'ES256', 
-            kid: "YZCFBAQQ4D", // Verified Key ID from Screenshot 1
+            kid: "YZCFBAQQ4D", 
             typ: 'JWT' 
         }
     });
 }
-// Logic: Charge the higher of Mileage total or Base Minimum total
+
+// Logic: Charge higher of Mileage total or Base Minimum total
 async function calculateDynamicQuote(vehicleType, pickupCoords, dropoffCoords) {
     const config = PRICING_CONFIG[vehicleType];
     if (!config) throw new Error(`Pricing not configured for: ${vehicleType}`);
@@ -140,7 +152,7 @@ async function calculateDynamicQuote(vehicleType, pickupCoords, dropoffCoords) {
         return {
             quote: parseFloat(finalQuote.toFixed(2)),
             distance: distanceInMiles.toFixed(2),
-            method: mileageTotal > config.baseRate ? "Mileage Rate" : "Base Rate"
+            method: mileageTotal > config.baseRate ? "Mileage Rate Applied" : "Minimum Base Rate Applied"
         };
     } catch (error) { 
         console.error("Apple Maps API Detail:", error.response?.data || error.message);

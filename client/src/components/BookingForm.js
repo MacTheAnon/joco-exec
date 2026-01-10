@@ -2,33 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { Map, Marker } from 'mapkit-react';
 
 const BookingForm = ({ onSubmit }) => {
-  // --- STATE MANAGEMENT (Coordinate Support Added) ---
+  // --- 1. STATE MANAGEMENT ---
   const [formData, setFormData] = useState({
     name: '', email: '', phone: '', date: '', time: '',
     pickup: '', dropoff: '', pickupCoords: null, dropoffCoords: null,
     meetAndGreet: false, passengers: '1', vehicleType: 'Luxury Sedan' 
   });
 
-  const [mapToken, setMapToken] = useState(null);
+  // HARD-CODED FRONTEND TOKEN
+  const [mapToken] = useState("eyJraWQiOiJCWTVHNDJMWlpUIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDQ1MjMzLCJvcmlnaW4iOiJ3d3cuam9jb2V4ZWMuY29tIn0.LYH5xVhL5SuksZViPKEYE5XSHaEuCgsSbT9GdYAa7CY22Z8ywpv_j5RxXQzTqjpiuGPUX0tPwetJCPTgr4G4VA");
+  
   const [checking, setChecking] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 600);
-  
-  // Autocomplete Result States
   const [pickupResults, setPickupResults] = useState([]);
   const [dropoffResults, setDropoffResults] = useState([]);
 
+  // --- 2. LIFECYCLE & RESIZE HANDLING ---
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 600);
     window.addEventListener('resize', handleResize);
-    
-    fetch('/api/maps/token')
-      .then(res => res.json())
-      .then(data => setMapToken(data.token));
-
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // --- APPLE MAPS SEARCH LOGIC ---
+  // --- 3. APPLE MAPS SEARCH LOGIC ---
   const handleAddressSearch = (query, setResults) => {
     if (!window.mapkit || query.length < 3) return;
     const region = new window.mapkit.CoordinateRegion(
@@ -45,7 +41,7 @@ const BookingForm = ({ onSubmit }) => {
     setFormData({ 
       ...formData, 
       [field]: result.displayLines.join(', '),
-      [`${field}Coords`]: result.coordinate // Stores Lat/Lng for distance API
+      [`${field}Coords`]: result.coordinate // Required for backend distance API
     });
     setResults([]); 
   };
@@ -55,6 +51,7 @@ const BookingForm = ({ onSubmit }) => {
     setFormData({ ...formData, [e.target.name]: value });
   };
 
+  // --- 4. SUBMISSION & PRICING REQUEST ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.pickupCoords || !formData.dropoffCoords) {
@@ -64,23 +61,8 @@ const BookingForm = ({ onSubmit }) => {
     setChecking(true);
 
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'https://www.jocoexec.com';
-
-      // 1. Availability Check
-      const availRes = await fetch(`${apiUrl}/api/check-availability`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: formData.date, time: formData.time }),
-      });
-      const availData = await availRes.json();
-      if (!availData.available) {
-        alert("❌ Slot already booked.");
-        setChecking(false);
-        return;
-      }
-
-      // 2. GET QUOTE (Passes Coordinates for Mileage Math)
-      const quoteRes = await fetch(`${apiUrl}/api/get-quote`, {
+      // Passes coordinates to the backend pricing engine
+      const quoteRes = await fetch('/api/get-quote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -91,6 +73,7 @@ const BookingForm = ({ onSubmit }) => {
       });
       const quoteData = await quoteRes.json();
 
+      // Send processed quote and distance to payment handler
       onSubmit({ 
           ...formData, 
           amount: Math.round(quoteData.quote * 100), 
@@ -104,13 +87,16 @@ const BookingForm = ({ onSubmit }) => {
     }
   };
 
+  // --- 5. UI COMPONENTS ---
   return (
     <div style={formCardStyle}>
       <div style={{ textAlign: 'center', marginBottom: '25px' }}>
         <h2 style={headerTitleStyle}>Request a Ride</h2>
-        {mapToken ? (
-           <div style={mapBoxStyle}><Map token={mapToken}><Marker latitude={38.8814} longitude={-94.8191} title="JOCO EXEC" /></Map></div>
-        ) : <div style={mapLoaderStyle}>Initializing Secure Maps...</div>}
+        <div style={mapBoxStyle}>
+          <Map token={mapToken}>
+            <Marker latitude={38.8814} longitude={-94.8191} title="JOCO EXEC" />
+          </Map>
+        </div>
       </div>
       
       <form onSubmit={handleSubmit}>
@@ -201,13 +187,12 @@ const BookingForm = ({ onSubmit }) => {
   );
 };
 
-// --- STYLES (100% Preserved) ---
+// --- 6. STYLES (Preserved Original) ---
 const formCardStyle = { background: '#111', border: '1px solid #C5A059', padding: '35px', borderRadius: '12px', maxWidth: '550px', width: '100%', margin: '0 auto', color: '#fff', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', boxSizing: 'border-box', position: 'relative'};
-const dropdownStyle = { position: 'absolute', zIndex: 1000, background: '#000', border: '1px solid #C5A059', borderRadius: '4px', width: '90%', marginTop: '-15px' };
+const dropdownStyle = { position: 'absolute', zIndex: 1000, background: '#000', border: '1px solid #C5A059', borderRadius: '4px', width: '100%', marginTop: '0' };
 const dropdownItemStyle = { padding: '12px', cursor: 'pointer', borderBottom: '1px solid #222', fontSize: '0.9rem', color: '#fff' };
 const headerTitleStyle = { color: '#C5A059', marginTop: 0, fontSize: '1.8rem', fontFamily: '"Playfair Display", serif', marginBottom: '5px'};
 const mapBoxStyle = { height: '200px', borderRadius: '8px', overflow: 'hidden', marginTop: '20px', border: '1px solid #333' };
-const mapLoaderStyle = { height: '200px', marginTop: '20px', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#C5A059' };
 const inputGroupStyle = { marginBottom: '20px'};
 const rowGridStyle = { display: 'flex', flexDirection: 'row', gap: '15px', marginBottom: '20px'};
 const columnGridStyle = { display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '20px'};
