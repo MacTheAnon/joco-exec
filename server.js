@@ -83,7 +83,7 @@ app.get('/api/maps/token', (req, res) => {
         const payload = {
             iss: process.env.APPLE_MAPS_TEAM_ID, 
             iat: Math.floor(Date.now() / 1000),
-            exp: Math.floor(Date.now() / 1000) + (1800),
+            exp: Math.floor(Date.now() / 1000) + (1200), // Max 20 mins
             origin: "https://www.jocoexec.com"
         };
         const token = jwt.sign(payload, process.env.APPLE_MAPS_PRIVATE_KEY.replace(/\\n/g, '\n'), {
@@ -96,12 +96,13 @@ app.get('/api/maps/token', (req, res) => {
     }
 });
 
-// Server-to-Server Token for Apple ETAs API
+// Server-to-Server Token for Apple ETAs API (Fixes 401 error with short expiry)
 async function getAppleMapsServerToken() {
+    const iat = Math.floor(Date.now() / 1000);
     const payload = {
         iss: process.env.APPLE_MAPS_TEAM_ID,
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 3600,
+        iat: iat,
+        exp: iat + 900, // 15 minutes - Mandatory for server APIs
     };
     return jwt.sign(payload, process.env.APPLE_MAPS_PRIVATE_KEY.replace(/\\n/g, '\n'), {
         algorithm: 'ES256',
@@ -109,30 +110,34 @@ async function getAppleMapsServerToken() {
     });
 }
 
-// Pricing Logic: Charge higher of Mileage total or Base Minimum total
+// Logic: Charge the higher of Mileage total or Base Minimum total
 async function calculateDynamicQuote(vehicleType, pickupCoords, dropoffCoords) {
     const config = PRICING_CONFIG[vehicleType];
     if (!config) throw new Error(`Pricing not configured for: ${vehicleType}`);
 
-    const serverToken = await getAppleMapsServerToken();
     try {
+        const serverToken = await getAppleMapsServerToken();
         const url = `https://maps-api.apple.com/v1/etas?origin=${pickupCoords.latitude},${pickupCoords.longitude}&destinations=${dropoffCoords.latitude},${dropoffCoords.longitude}&transportType=Automobile`;
+        
         const response = await axios.get(url, { headers: { 'Authorization': `Bearer ${serverToken}` } });
         
+        if (!response.data.etas || response.data.etas.length === 0) throw new Error("No route found");
+
         const distanceMeters = response.data.etas[0].distanceMeters; 
         const distanceInMiles = distanceMeters / 1609.34;
         const mileageTotal = distanceInMiles * config.perMileRate;
         
+        // Return higher of Mileage or Base Minimum
         const finalQuote = Math.max(config.baseRate, mileageTotal);
 
         return {
             quote: parseFloat(finalQuote.toFixed(2)),
             distance: distanceInMiles.toFixed(2),
-            method: mileageTotal > config.baseRate ? "Mileage Rate Applied" : "Minimum Base Rate Applied"
+            method: mileageTotal > config.baseRate ? "Mileage Rate" : "Base Rate"
         };
     } catch (error) { 
-        console.error("Distance Error:", error.message);
-        return { quote: config.baseRate, error: "Calculation failed, using minimum." }; 
+        console.error("Apple Maps API Detail:", error.response?.data || error.message);
+        return { quote: config.baseRate, distance: "0.00", error: "Distance calculation failed" }; 
     }
 }
 
@@ -224,15 +229,13 @@ app.post('/api/process-payment', async (req, res) => {
         // --- CHAUFFEUR NOTIFICATIONS ---
         const drivers = getUsers().filter(u => u.role === 'driver' && u.isApproved);
         drivers.forEach(async (driver) => {
-            // Email Chauffeur
             transporter.sendMail({
                 from: `"JOCO EXEC" <${process.env.EMAIL_USER}>`, 
                 to: driver.email,
                 subject: `NEW JOB: ${newBooking.date}`,
-                html: `<p>New Job Available: ${newBooking.pickup} to ${newBooking.dropoff}</p>`
+                html: `<p>New Job Available: ${newBooking.pickup} to ${newBooking.dropoff}</p><p>Fare: $${(Number(amountInCents)/100).toFixed(2)}</p>`
             }).catch(e => console.error("Email Error:", e.message));
 
-            // Twilio SMS Chauffeur
             if (process.env.TWILIO_PHONE) {
                 twilioClient.messages.create({
                     body: `JOCO EXEC: New job on ${newBooking.date} from ${newBooking.pickup}.`,
@@ -248,10 +251,7 @@ app.post('/api/process-payment', async (req, res) => {
     }
 });
 
-// ==========================================
-// 5. ADMIN CONTROL ROUTES
-// ==========================================
-
+// Admin Routes
 app.get('/api/admin/bookings', (req, res) => res.json(getBookings()));
 app.get('/api/admin/users', (req, res) => res.json(getUsers()));
 
@@ -264,15 +264,12 @@ app.post('/api/admin/approve-driver', (req, res) => {
 });
 
 app.delete('/api/admin/bookings/:id', (req, res) => {
-    const { id } = req.params;
-    const newBookings = getBookings().filter(b => b.id !== id);
+    const newBookings = getBookings().filter(b => b.id !== req.params.id);
     fs.writeFileSync(DB_FILE, JSON.stringify(newBookings, null, 2));
     res.json({ success: true });
 });
 
-// ==========================================
-// 6. FRONTEND & START
-// ==========================================
+// Frontend Static Loading
 app.use(express.static(path.join(__dirname, 'client', 'build')));
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'client', 'build', 'index.html')));
 
