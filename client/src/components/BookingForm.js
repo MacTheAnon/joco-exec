@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Map, Marker } from 'mapkit-react';
-
+const KC_REGION = {
+  centerLatitude: 38.8814,
+  centerLongitude: -94.8191,
+  latitudeDelta: 0.5,
+  longitudeDelta: 0.5
+};
 const BookingForm = ({ onSubmit }) => {
   // --- 1. STATE MANAGEMENT ---
   const [formData, setFormData] = useState({
