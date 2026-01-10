@@ -73,54 +73,49 @@ const saveUser = (u) => {
 };
 
 // ==========================================
-// 3. APPLE MAPS INTEGRATION (FIXED)
+// 3. APPLE MAPS INTEGRATION (STATIC TOKEN FIX)
 // ==========================================
 
-/**
- * Helper to generate a valid MapKit JS Token.
- * Handles origin cleaning and timestamp leeway.
- */
-const generateMapToken = (requestOrigin) => {
-    // 1. Clean the origin: Remove "https://" and trailing slashes
-    // This creates the EXACT match Apple requires for the whitelist
-    const cleanOrigin = (requestOrigin || "www.jocoexec.com").replace(/^https?:\/\//, '').replace(/\/$/, '');
-
-    const payload = {
-        iss: process.env.APPLE_MAPS_TEAM_ID || "827CZWJ6A7", 
-        iat: Math.floor(Date.now() / 1000) - 30, // 30-second leeway to prevent "Not Before" errors
-        exp: Math.floor(Date.now() / 1000) + 1200, // Expires in 20 mins
-        origin: cleanOrigin
-    };
+// These are the valid, non-expiring tokens from your CSV file.
+// We serve these directly to bypass the Private Key configuration issues.
+const MAPS_TOKENS = {
+    // For your live website
+    "www.jocoexec.com": "eyJraWQiOiI2VTgySkZDNlhUIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg0NjQ4LCJvcmlnaW4iOiJ3d3cuam9jb2V4ZWMuY29tIn0.-gPvMZbjh6DKKeTbEZP0QRgaEkxfA1X1jcO3ZZPenAzhhOd9t_gsBzaOxnGGTUaPQkl-2XbxoNpKOva-B8ZRCw",
     
-    // Ensure newlines are handled correctly in the private key from Env Vars
-    const privateKey = (process.env.APPLE_MAPS_PRIVATE_KEY || "").replace(/\\n/g, '\n');
-
-    return jwt.sign(payload, privateKey, {
-        algorithm: 'ES256',
-        header: { 
-            alg: 'ES256', 
-            typ: 'JWT', 
-            kid: process.env.APPLE_MAPS_KEY_ID || "RFDK578343" 
-        }
-    });
+    // For your Railway testing site
+    "joco-exec.up.railway.app": "eyJraWQiOiI2Njc5N0hUNlQ0IiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg0NjQ4LCJvcmlnaW4iOiJqb2NvLWV4ZWMudXAucmFpbHdheS5hcHAifQ.-MpV0iYJQyMKN5NmIB1JFJj6eQcoE0B114XN1dK11jcISly8JluOfKvJ98ia1vToRhvhmhj3SPhzJ7Z_XUTb9g",
+    
+    // Fallback / Wildcard for any other subdomain
+    "default": "eyJraWQiOiJTVDZIRzI5SDJBIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg2NTA3LCJvcmlnaW4iOiIqLmpvY29leGVjLmNvbSJ9.in54tp2O2ZteVBOVkY2jUExdZ4o691DKx_UsMTlRU5XVeZOg8br4XCMDYsF_NrK8le2elwOGSHTh6dnEBJl2_A"
 };
 
 // Route: Frontend Token Request
 app.get('/api/maps/token', (req, res) => {
     try {
-        // Pass the browser's origin header to the generator
-        const token = generateMapToken(req.headers.origin);
+        // 1. Get the request origin and clean it (remove https://)
+        let origin = req.headers.origin || "";
+        origin = origin.replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+        // 2. Select the correct token from your pre-authorized list
+        let token = MAPS_TOKENS[origin];
+
+        // 3. Fallback to the wildcard token if the specific domain isn't found
+        if (!token) {
+            console.log(`Using default wildcard token for origin: ${origin}`);
+            token = MAPS_TOKENS["default"];
+        }
+
         res.json({ token });
     } catch (error) {
         console.error("Map Token Error:", error);
-        res.status(500).json({ error: "Token generation failed" });
+        res.status(500).json({ error: "Token retrieval failed" });
     }
 });
 
 // Helper: For Server-Side Quote Calculation
 const getAppleMapsServerToken = async () => {
-    // For server-side requests, we act as the main domain
-    return generateMapToken("www.jocoexec.com");
+    // Use the main website token for server-side calculations
+    return MAPS_TOKENS["www.jocoexec.com"];
 };
 
 // Logic: Charge higher of Mileage total or Base Minimum total
