@@ -29,29 +29,31 @@ const BookingForm = ({ onSubmit }) => {
   // --- GOOGLE MAPS HOOKS (Fixes the Ref/Crash Error) ---
   
   // 1. Pickup Ref
-  const { ref: pickupRef } = usePlacesWidget({
-    apiKey: process.env.REACT_APP_GOOGLE_MAPS_KEY,
-    onPlaceSelected: (place) => {
-      setFormData((prev) => ({ ...prev, pickup: place.formatted_address || place.name }));
-    },
-    options: {
-      types: ['geocode', 'establishment'],
-      componentRestrictions: { country: "us" },
-    },
-  });
+const { ref: pickupRef } = usePlacesWidget({
+  apiKey: process.env.REACT_APP_GOOGLE_MAPS_KEY,
+  onPlaceSelected: (place) => {
+    // Ensure we take a string property, never the 'place' object itself
+    const addr = place.formatted_address || place.name || "";
+    setFormData((prev) => ({ ...prev, pickup: addr }));
+  },
+  options: {
+    types: ['geocode', 'establishment'],
+    componentRestrictions: { country: "us" },
+  },
+});
 
-  // 2. Dropoff Ref
-  const { ref: dropoffRef } = usePlacesWidget({
-    apiKey: process.env.REACT_APP_GOOGLE_MAPS_KEY,
-    onPlaceSelected: (place) => {
-      setFormData((prev) => ({ ...prev, dropoff: place.formatted_address || place.name }));
-    },
-    options: {
-      types: ['geocode', 'establishment'],
-      componentRestrictions: { country: "us" },
-    },
-  });
-
+// 2. Dropoff Ref
+const { ref: dropoffRef } = usePlacesWidget({
+  apiKey: process.env.REACT_APP_GOOGLE_MAPS_KEY,
+  onPlaceSelected: (place) => {
+    const addr = place.formatted_address || place.name || "";
+    setFormData((prev) => ({ ...prev, dropoff: addr }));
+  },
+  options: {
+    types: ['geocode', 'establishment'],
+    componentRestrictions: { country: "us" },
+  },
+});
   // --- HANDLERS ---
   const handleChange = (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
