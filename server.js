@@ -286,13 +286,14 @@ app.delete('/api/admin/bookings/:id', (req, res) => {
 const clientBuildPath = path.join(__dirname, 'client', 'build');
 const rootBuildPath = path.join(__dirname, 'build');
 
-if (fs.existsSync(clientBuildPath)) {
-    app.use(express.static(clientBuildPath));
-    // Fixed the '*' error here for newer Express versions
-    app.get('/*', (req, res) => res.sendFile(path.join(clientBuildPath, 'index.html')));
-} else if (fs.existsSync(rootBuildPath)) {
-    app.use(express.static(rootBuildPath));
-    // Fixed the '*' error here for newer Express versions
-    app.get('/*', (req, res) => res.sendFile(path.join(rootBuildPath, 'index.html')));
-}
+app.get('/:splat*', (req, res) => {
+    const buildPath = path.join(__dirname, 'client', 'build');
+    const rootBuildPath = path.join(__dirname, 'build');
+    
+    if (fs.existsSync(buildPath)) {
+        res.sendFile(path.join(buildPath, 'index.html'));
+    } else {
+        res.sendFile(path.join(rootBuildPath, 'index.html'));
+    }
+});
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 JOCO EXEC running on port ${PORT}`));
