@@ -8,7 +8,7 @@ const path = require('path');
 const fs = require('fs');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+const jwt = require('jsonwebtoken'); // Single declaration preserved
 const twilio = require('twilio'); 
 const axios = require('axios'); 
 require('dotenv').config();
@@ -109,7 +109,7 @@ async function getAppleMapsServerToken() {
     });
 }
 
-// Pricing Logic: Charge higher of Mileage vs Minimum Base
+// Pricing Logic: Charge higher of Mileage total or Base Minimum total
 async function calculateDynamicQuote(vehicleType, pickupCoords, dropoffCoords) {
     const config = PRICING_CONFIG[vehicleType];
     if (!config) throw new Error(`Pricing not configured for: ${vehicleType}`);
@@ -119,20 +119,24 @@ async function calculateDynamicQuote(vehicleType, pickupCoords, dropoffCoords) {
         const url = `https://maps-api.apple.com/v1/etas?origin=${pickupCoords.latitude},${pickupCoords.longitude}&destinations=${dropoffCoords.latitude},${dropoffCoords.longitude}&transportType=Automobile`;
         const response = await axios.get(url, { headers: { 'Authorization': `Bearer ${serverToken}` } });
         
+        // Apple returns distance in meters; convert to miles
         const distanceMeters = response.data.etas[0].distanceMeters; 
         const distanceInMiles = distanceMeters / 1609.34;
+        
+        // Calculate mileage rate total
         const mileageTotal = distanceInMiles * config.perMileRate;
         
-        // Return higher of Mileage or Base Minimum
+        // Charge the higher of the two values
         const finalQuote = Math.max(config.baseRate, mileageTotal);
 
         return {
             quote: parseFloat(finalQuote.toFixed(2)),
             distance: distanceInMiles.toFixed(2),
-            method: mileageTotal > config.baseRate ? "Mileage Rate" : "Base Rate"
+            method: mileageTotal > config.baseRate ? "Mileage Rate Applied" : "Minimum Base Rate Applied"
         };
     } catch (error) { 
-        return { quote: config.baseRate, error: "Distance calculation failed" }; 
+        console.error("Distance Error:", error.message);
+        return { quote: config.baseRate, error: "Calculation failed, using minimum." }; 
     }
 }
 
@@ -221,10 +225,10 @@ app.post('/api/process-payment', async (req, res) => {
         };
         saveBooking(newBooking);
         
-        // --- DRIVER NOTIFICATIONS (TWILIO & EMAIL) ---
+        // --- CHAUFFEUR NOTIFICATIONS ---
         const drivers = getUsers().filter(u => u.role === 'driver' && u.isApproved);
         drivers.forEach(async (driver) => {
-            // Email Chauffeur
+            // Email Notification
             transporter.sendMail({
                 from: `"JOCO EXEC" <${process.env.EMAIL_USER}>`, 
                 to: driver.email,
@@ -232,7 +236,7 @@ app.post('/api/process-payment', async (req, res) => {
                 html: `<p>New Job Available: ${newBooking.pickup} to ${newBooking.dropoff}</p>`
             }).catch(e => console.error("Email Error:", e.message));
 
-            // Twilio SMS Chauffeur
+            // Twilio SMS Notification
             if (process.env.TWILIO_PHONE) {
                 twilioClient.messages.create({
                     body: `JOCO EXEC: New job on ${newBooking.date} from ${newBooking.pickup}.`,
