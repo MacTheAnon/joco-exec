@@ -1,0 +1,47 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build React App
+        run: npm run build
+
+      - name: Add iOS Platform
+        run: |
+          npm install @capacitor/ios
+          npx cap add ios
+          npx cap sync ios
+
+      - name: Build IPA
+        uses: yukiarrr/ios-build-action@v1.5.0
+        with:
+          project-path: ios/App/App.xcodeproj
+          p12-base64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          p12-password: ${{ secrets.P12_PASSWORD }}
+          mobileprovision-base64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+          code-signing-identity: "iPhone Distribution"
+          team-id: "827CZWJ6A7"  # <--- REPLACE THIS with your 10-char Team ID (e.g. )
+          workspace-path: ios/App/App.xcworkspace
+          export-method: "ad-hoc" # Use "ad-hoc" if you want to install on your own phone immediately
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v3
+        with:
+          name: joco-exec-app
+          path: output.ipa
