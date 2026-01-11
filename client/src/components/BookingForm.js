@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Map, Marker } from 'mapkit-react';
 
 const BookingForm = ({ onSubmit }) => {
+  // --- 1. STATE MANAGEMENT ---
   const [formData, setFormData] = useState({
     name: '', email: '', phone: '', date: '', time: '',
     pickup: '', dropoff: '', pickupCoords: null, dropoffCoords: null,
@@ -10,23 +11,26 @@ const BookingForm = ({ onSubmit }) => {
 
   const [mapToken, setMapToken] = useState(null);
   const [checking, setChecking] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 600);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [pickupResults, setPickupResults] = useState([]);
   const [dropoffResults, setDropoffResults] = useState([]);
 
+  // --- 2. LIFECYCLE ---
   useEffect(() => {
+    // Fetch Token
     fetch('/api/maps/token')
       .then(res => res.json())
       .then(data => {
         if (data.token) setMapToken(data.token);
       })
-      .catch(err => console.error("Map Token Fetch Error:", err));
+      .catch(err => console.error("Map Token Error:", err));
 
-    const handleResize = () => setIsMobile(window.innerWidth < 600);
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // --- 3. APPLE MAPS LOGIC ---
   const handleAddressSearch = (query, setResults) => {
     if (!window.mapkit || query.length < 3) return;
     
@@ -55,16 +59,22 @@ const BookingForm = ({ onSubmit }) => {
     setFormData({ ...formData, [e.target.name]: value });
   };
 
-  // --- SUBMISSION LOGIC ---
+  // --- 4. SUBMISSION & CALCULATION (CRASH FIX) ---
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.pickupCoords || !formData.dropoffCoords) {
-      alert("Please select addresses from the dropdown list to ensure accurate pricing.");
+      alert("Please select addresses from the dropdown list.");
       return;
     }
     setChecking(true);
 
-    // 1. USE FRONTEND MAP TO CALCULATE DISTANCE
+    // Safety Check: Ensure MapKit is loaded
+    if (!window.mapkit) {
+      alert("Map services are not fully loaded. Please refresh.");
+      setChecking(false);
+      return;
+    }
+
     const directions = new window.mapkit.Directions();
     directions.route({
       origin: formData.pickupCoords,
@@ -72,31 +82,38 @@ const BookingForm = ({ onSubmit }) => {
       transportType: window.mapkit.Directions.Transport.Automobile
     }, async (error, data) => {
       
+      // CRASH FIX 1: Handle MapKit Errors
       if (error) {
         setChecking(false);
-        console.error("Route Error:", error);
-        alert("Could not calculate route. Please check addresses.");
+        console.error("MapKit Route Error:", error);
+        alert("Could not calculate driving route. Please ensure locations are reachable by car.");
         return;
       }
 
-      // 2. CONVERT METERS TO MILES
-      // data.routes[0] contains the best route
+      // CRASH FIX 2: Check if routes actually exist before reading
+      if (!data || !data.routes || data.routes.length === 0) {
+        setChecking(false);
+        alert("No route found between these locations.");
+        return;
+      }
+
       const distanceMeters = data.routes[0].distance;
       const distanceMiles = distanceMeters / 1609.34;
 
       try {
-        // 3. SEND DISTANCE TO SERVER FOR PRICING
         const quoteRes = await fetch('/api/get-quote', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
               vehicleType: formData.vehicleType,
-              distance: distanceMiles // Sending calculated distance
+              distance: distanceMiles 
           }),
         });
+        
+        if (!quoteRes.ok) throw new Error("Server Calculation Failed");
+        
         const quoteData = await quoteRes.json();
 
-        // 4. FINALIZE
         onSubmit({ 
             ...formData, 
             amount: Math.round(quoteData.quote * 100), 
@@ -104,25 +121,29 @@ const BookingForm = ({ onSubmit }) => {
         }); 
 
       } catch (err) {
-        alert("Error fetching quote. Please try again.");
+        console.error("Pricing Error:", err);
+        alert("Error calculating price. Please try again.");
       } finally {
         setChecking(false);
       }
     });
   };
 
-  // --- UI ---
+  // --- 5. UI COMPONENTS ---
   return (
     <div style={formCardStyle}>
       <div style={{ textAlign: 'center', marginBottom: '25px' }}>
         <h2 style={headerTitleStyle}>Request a Ride</h2>
+        
         <div style={mapBoxStyle}>
           {mapToken ? (
             <Map token={mapToken}>
                <Marker latitude={38.8814} longitude={-94.8191} title="JOCO EXEC" />
             </Map>
           ) : (
-            <div style={{display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'#666'}}>Loading Map...</div>
+            <div style={{display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'#666'}}>
+                Loading Map...
+            </div>
           )}
         </div>
       </div>
@@ -152,27 +173,67 @@ const BookingForm = ({ onSubmit }) => {
           <div style={{ flex: 1 }}><label style={labelStyle}>Time</label><input type="time" name="time" style={inputStyle} onChange={handleChange} required /></div>
         </div>
 
+        {/* PICKUP INPUT - WITH MOBILE TOUCH FIX */}
         <div style={inputGroupStyle}>
             <label style={labelStyle}>Pickup Location</label>
-            <input type="text" style={inputStyle} placeholder="Start typing pickup address..." value={formData.pickup}
-                onChange={(e) => { setFormData({...formData, pickup: e.target.value}); handleAddressSearch(e.target.value, setPickupResults); }} required />
+            <input 
+                type="text" 
+                style={inputStyle} 
+                placeholder="Start typing pickup address..." 
+                value={formData.pickup}
+                onChange={(e) => { 
+                  setFormData({...formData, pickup: e.target.value}); 
+                  handleAddressSearch(e.target.value, setPickupResults); 
+                }}
+                required 
+            />
             {pickupResults.length > 0 && (
               <div style={dropdownStyle}>
                 {pickupResults.map(res => (
-                  <div key={res.id} style={dropdownItemStyle} onClick={() => handleSelectAddress(res, 'pickup', setPickupResults)}>{res.displayLines.join(', ')}</div>
+                  <div 
+                    key={res.id} 
+                    style={dropdownItemStyle} 
+                    onMouseDown={(e) => {
+                      e.preventDefault(); 
+                      handleSelectAddress(res, 'pickup', setPickupResults);
+                    }}
+                    onClick={() => handleSelectAddress(res, 'pickup', setPickupResults)}
+                  >
+                    {res.displayLines.join(', ')}
+                  </div>
                 ))}
               </div>
             )}
         </div>
 
+        {/* DROPOFF INPUT - WITH MOBILE TOUCH FIX */}
         <div style={inputGroupStyle}>
             <label style={labelStyle}>Dropoff Destination</label>
-            <input type="text" style={inputStyle} placeholder="Start typing dropoff address..." value={formData.dropoff}
-                onChange={(e) => { setFormData({...formData, dropoff: e.target.value}); handleAddressSearch(e.target.value, setDropoffResults); }} required />
+            <input 
+                type="text" 
+                style={inputStyle} 
+                placeholder="Start typing dropoff address..." 
+                value={formData.dropoff}
+                onChange={(e) => { 
+                  setFormData({...formData, dropoff: e.target.value}); 
+                  handleAddressSearch(e.target.value, setDropoffResults); 
+                }}
+                required 
+            />
             {dropoffResults.length > 0 && (
               <div style={dropdownStyle}>
                 {dropoffResults.map(res => (
-                  <div key={res.id} style={dropdownItemStyle} onClick={() => handleSelectAddress(res, 'dropoff', setDropoffResults)}>{res.displayLines.join(', ')}</div>
+                  <div 
+                    key={res.id} 
+                    style={dropdownItemStyle} 
+                    onMouseDown={(e) => {
+                      e.preventDefault(); 
+                      handleSelectAddress(res, 'dropoff', setDropoffResults);
+                    }}
+                    onClick={() => handleSelectAddress(res, 'dropoff', setDropoffResults)}
+                  >
+                    {res.displayLines.join(', ')}
+                  </div>
                 ))}
               </div>
             )}
@@ -193,20 +254,20 @@ const BookingForm = ({ onSubmit }) => {
   );
 };
 
-// --- STYLES ---
-const formCardStyle = { background: '#111', border: '1px solid #C5A059', padding: '35px', borderRadius: '12px', maxWidth: '550px', width: '100%', margin: '0 auto', color: '#fff', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', boxSizing: 'border-box', position: 'relative'};
-const dropdownStyle = { position: 'absolute', zIndex: 1000, background: '#000', border: '1px solid #C5A059', borderRadius: '4px', width: '100%', marginTop: '0' };
-const dropdownItemStyle = { padding: '12px', cursor: 'pointer', borderBottom: '1px solid #222', fontSize: '0.9rem', color: '#fff' };
+// --- STYLES (Optimized for Mobile) ---
+const formCardStyle = { background: '#111', border: '1px solid #C5A059', padding: '25px', borderRadius: '12px', maxWidth: '550px', width: '100%', margin: '0 auto', color: '#fff', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', boxSizing: 'border-box', position: 'relative'};
+const dropdownStyle = { position: 'absolute', zIndex: 9999, background: '#000', border: '1px solid #C5A059', borderRadius: '4px', width: '100%', marginTop: '0', maxHeight: '200px', overflowY: 'auto' };
+const dropdownItemStyle = { padding: '15px', cursor: 'pointer', borderBottom: '1px solid #222', fontSize: '1rem', color: '#fff', background: '#000' };
 const headerTitleStyle = { color: '#C5A059', marginTop: 0, fontSize: '1.8rem', fontFamily: '"Playfair Display", serif', marginBottom: '5px'};
-const mapBoxStyle = { height: '200px', borderRadius: '8px', overflow: 'hidden', marginTop: '20px', border: '1px solid #333' };
-const inputGroupStyle = { marginBottom: '20px'};
+const mapBoxStyle = { height: '200px', borderRadius: '8px', overflow: 'hidden', marginTop: '20px', border: '1px solid #333', background: '#222' };
+const inputGroupStyle = { marginBottom: '20px', position: 'relative' }; 
 const rowGridStyle = { display: 'flex', flexDirection: 'row', gap: '15px', marginBottom: '20px'};
 const columnGridStyle = { display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '20px'};
 const labelStyle = { display: 'block', marginBottom: '8px', color: '#C5A059', fontWeight: 'bold', fontSize: '0.85rem', textTransform: 'uppercase'};
 const inputStyle = { width: '100%', padding: '14px', background: '#000', border: '1px solid #333', color: '#fff', borderRadius: '6px', boxSizing: 'border-box', fontSize: '16px'};
 const checkboxContainerStyle = { marginBottom: '25px', padding: '15px', background: '#000', borderRadius: '6px', border: '1px solid #333' };
 const checkboxLabelStyle = { color: '#C5A059', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1rem' };
-const checkboxStyle = { width: '20px', height: '20px', accentColor: '#C5A059', cursor: 'pointer'};
+const checkboxStyle = { width: '24px', height: '24px', accentColor: '#C5A059', cursor: 'pointer'};
 const activeButtonStyle = { width: '100%', padding: '18px', background: '#C5A059', color: '#000', border: 'none', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', borderRadius: '6px', textTransform: 'uppercase'};
 const disabledButtonStyle = { ...activeButtonStyle, background: '#555', color: '#888', cursor: 'not-allowed'};
 
