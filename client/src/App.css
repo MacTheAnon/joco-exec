@@ -84,11 +84,14 @@ input, select, textarea, button {
   padding: 5px;
 }
 
-/*/* HERO SECTION */
+/* =========================================
+   3. HERO SECTION
+   ========================================= */
+/* HERO SECTION */
 .hero {
   height: 85vh;
-  /* Use this Web URL instead of a local file path */
-  background-image: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&q=80'); 
+  /* This looks for background.jpg inside client/src/ */
+  background-image: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('./background.jpg'); 
   background-size: cover;
   background-position: center;
   display: flex; 
