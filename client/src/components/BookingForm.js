@@ -2,31 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { Map, Marker } from 'mapkit-react';
 
 const BookingForm = ({ onSubmit }) => {
-  // --- 1. STATE MANAGEMENT ---
   const [formData, setFormData] = useState({
     name: '', email: '', phone: '', date: '', time: '',
     pickup: '', dropoff: '', pickupCoords: null, dropoffCoords: null,
     meetAndGreet: false, passengers: '1', vehicleType: 'Luxury Sedan' 
   });
 
-  // DYNAMIC TOKEN STATE
   const [mapToken, setMapToken] = useState(null);
   const [checking, setChecking] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 600);
   const [pickupResults, setPickupResults] = useState([]);
   const [dropoffResults, setDropoffResults] = useState([]);
 
-  // --- 2. LIFECYCLE: FETCH TOKEN AUTOMATICALLY ---
   useEffect(() => {
-    // This calls your server.js, which detects the domain and returns the correct key
     fetch('/api/maps/token')
       .then(res => res.json())
       .then(data => {
-        if (data.token) {
-            setMapToken(data.token);
-        } else {
-            console.error("Server returned no token");
-        }
+        if (data.token) setMapToken(data.token);
       })
       .catch(err => console.error("Map Token Fetch Error:", err));
 
@@ -35,25 +27,17 @@ const BookingForm = ({ onSubmit }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // --- 3. APPLE MAPS SEARCH LOGIC ---
   const handleAddressSearch = (query, setResults) => {
-    // Only search if mapkit is loaded
     if (!window.mapkit || query.length < 3) return;
     
-    // Search Region: Kansas City
     const region = new window.mapkit.CoordinateRegion(
       new window.mapkit.Coordinate(38.8814, -94.8191),
       new window.mapkit.CoordinateSpan(0.5, 0.5)
     );
-    
     const search = new window.mapkit.Search({ region });
     
     search.autocomplete(query, (error, data) => {
-      if (!error) {
-        setResults(data.results);
-      } else {
-        console.warn("Autocomplete Error:", error);
-      }
+      if (!error) setResults(data.results);
     });
   };
 
@@ -71,8 +55,8 @@ const BookingForm = ({ onSubmit }) => {
     setFormData({ ...formData, [e.target.name]: value });
   };
 
-  // --- 4. SUBMISSION ---
-  const handleSubmit = async (e) => {
+  // --- SUBMISSION LOGIC ---
+  const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.pickupCoords || !formData.dropoffCoords) {
       alert("Please select addresses from the dropdown list to ensure accurate pricing.");
@@ -80,46 +64,65 @@ const BookingForm = ({ onSubmit }) => {
     }
     setChecking(true);
 
-    try {
-      const quoteRes = await fetch('/api/get-quote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-            vehicleType: formData.vehicleType,
-            pickup: formData.pickupCoords,
-            dropoff: formData.dropoffCoords
-        }),
-      });
-      const quoteData = await quoteRes.json();
+    // 1. USE FRONTEND MAP TO CALCULATE DISTANCE
+    const directions = new window.mapkit.Directions();
+    directions.route({
+      origin: formData.pickupCoords,
+      destination: formData.dropoffCoords,
+      transportType: window.mapkit.Directions.Transport.Automobile
+    }, async (error, data) => {
+      
+      if (error) {
+        setChecking(false);
+        console.error("Route Error:", error);
+        alert("Could not calculate route. Please check addresses.");
+        return;
+      }
 
-      onSubmit({ 
-          ...formData, 
-          amount: Math.round(quoteData.quote * 100), 
-          distance: quoteData.distance 
-      }); 
+      // 2. CONVERT METERS TO MILES
+      // data.routes[0] contains the best route
+      const distanceMeters = data.routes[0].distance;
+      const distanceMiles = distanceMeters / 1609.34;
 
-    } catch (err) {
-      alert("Error fetching quote. Please try again.");
-    } finally {
-      setChecking(false);
-    }
+      try {
+        // 3. SEND DISTANCE TO SERVER FOR PRICING
+        const quoteRes = await fetch('/api/get-quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+              vehicleType: formData.vehicleType,
+              distance: distanceMiles // Sending calculated distance
+          }),
+        });
+        const quoteData = await quoteRes.json();
+
+        // 4. FINALIZE
+        onSubmit({ 
+            ...formData, 
+            amount: Math.round(quoteData.quote * 100), 
+            distance: quoteData.distance 
+        }); 
+
+      } catch (err) {
+        alert("Error fetching quote. Please try again.");
+      } finally {
+        setChecking(false);
+      }
+    });
   };
 
-  // --- 5. UI COMPONENTS ---
+  // --- UI ---
   return (
     <div style={formCardStyle}>
       <div style={{ textAlign: 'center', marginBottom: '25px' }}>
         <h2 style={headerTitleStyle}>Request a Ride</h2>
         <div style={mapBoxStyle}>
-          {/* Wait for token before loading map to prevent 401 errors */}
           {mapToken ? (
             <Map token={mapToken}>
                <Marker latitude={38.8814} longitude={-94.8191} title="JOCO EXEC" />
             </Map>
           ) : (
-            <div style={{display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'#666'}}>
-                Loading Map...
-            </div>
+            <div style={{display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'#666'}}>Loading Map...</div>
           )}
         </div>
       </div>
@@ -151,23 +154,12 @@ const BookingForm = ({ onSubmit }) => {
 
         <div style={inputGroupStyle}>
             <label style={labelStyle}>Pickup Location</label>
-            <input 
-                type="text" 
-                style={inputStyle} 
-                placeholder="Start typing pickup address..." 
-                value={formData.pickup}
-                onChange={(e) => {
-                  setFormData({...formData, pickup: e.target.value});
-                  handleAddressSearch(e.target.value, setPickupResults);
-                }}
-                required 
-            />
+            <input type="text" style={inputStyle} placeholder="Start typing pickup address..." value={formData.pickup}
+                onChange={(e) => { setFormData({...formData, pickup: e.target.value}); handleAddressSearch(e.target.value, setPickupResults); }} required />
             {pickupResults.length > 0 && (
               <div style={dropdownStyle}>
                 {pickupResults.map(res => (
-                  <div key={res.id} style={dropdownItemStyle} onClick={() => handleSelectAddress(res, 'pickup', setPickupResults)}>
-                    {res.displayLines.join(', ')}
-                  </div>
+                  <div key={res.id} style={dropdownItemStyle} onClick={() => handleSelectAddress(res, 'pickup', setPickupResults)}>{res.displayLines.join(', ')}</div>
                 ))}
               </div>
             )}
@@ -175,23 +167,12 @@ const BookingForm = ({ onSubmit }) => {
 
         <div style={inputGroupStyle}>
             <label style={labelStyle}>Dropoff Destination</label>
-            <input 
-                type="text" 
-                style={inputStyle} 
-                placeholder="Start typing dropoff address..." 
-                value={formData.dropoff}
-                onChange={(e) => {
-                  setFormData({...formData, dropoff: e.target.value});
-                  handleAddressSearch(e.target.value, setDropoffResults);
-                }}
-                required 
-            />
+            <input type="text" style={inputStyle} placeholder="Start typing dropoff address..." value={formData.dropoff}
+                onChange={(e) => { setFormData({...formData, dropoff: e.target.value}); handleAddressSearch(e.target.value, setDropoffResults); }} required />
             {dropoffResults.length > 0 && (
               <div style={dropdownStyle}>
                 {dropoffResults.map(res => (
-                  <div key={res.id} style={dropdownItemStyle} onClick={() => handleSelectAddress(res, 'dropoff', setDropoffResults)}>
-                    {res.displayLines.join(', ')}
-                  </div>
+                  <div key={res.id} style={dropdownItemStyle} onClick={() => handleSelectAddress(res, 'dropoff', setDropoffResults)}>{res.displayLines.join(', ')}</div>
                 ))}
               </div>
             )}

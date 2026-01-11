@@ -10,7 +10,6 @@ const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken'); 
 const twilio = require('twilio'); 
-const axios = require('axios'); 
 require('dotenv').config();
 
 // --- BIGINT FIX ---
@@ -73,88 +72,48 @@ const saveUser = (u) => {
 };
 
 // ==========================================
-// 3. APPLE MAPS INTEGRATION (UNIVERSAL FIX)
+// 3. APPLE MAPS INTEGRATION (TOKEN DELIVERY ONLY)
 // ==========================================
 
-// Valid pre-approved tokens from your CSV
+// These are your valid, pre-approved tokens.
 const MAPS_TOKENS = {
-    // Live Production
     "www.jocoexec.com": "eyJraWQiOiI2VTgySkZDNlhUIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg0NjQ4LCJvcmlnaW4iOiJ3d3cuam9jb2V4ZWMuY29tIn0.-gPvMZbjh6DKKeTbEZP0QRgaEkxfA1X1jcO3ZZPenAzhhOd9t_gsBzaOxnGGTUaPQkl-2XbxoNpKOva-B8ZRCw",
     "jocoexec.com": "eyJraWQiOiJZTDIyTEM2NlYyIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg0NjQ4LCJvcmlnaW4iOiJqb2NvZXhlYy5jb20ifQ.661L0KfLEy9eNS8BucF-ZIGSaILZc3JXnhFoP1SvvniHUcZVL2YiyRIXxboashR6rtnjnxoeD5ZhG9Itu8va4w",
-    
-    // Railway Deployment
     "joco-exec.up.railway.app": "eyJraWQiOiI2Njc5N0hUNlQ0IiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg0NjQ4LCJvcmlnaW4iOiJqb2NvLWV4ZWMudXAucmFpbHdheS5hcHAifQ.-MpV0iYJQyMKN5NmIB1JFJj6eQcoE0B114XN1dK11jcISly8JluOfKvJ98ia1vToRhvhmhj3SPhzJ7Z_XUTb9g",
-    
-    // Wildcard Fallback (*.jocoexec.com)
     "default": "eyJraWQiOiJTVDZIRzI5SDJBIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg2NTA3LCJvcmlnaW4iOiIqLmpvY29leGVjLmNvbSJ9.in54tp2O2ZteVBOVkY2jUExdZ4o691DKx_UsMTlRU5XVeZOg8br4XCMDYsF_NrK8le2elwOGSHTh6dnEBJl2_A"
 };
 
-// Route: Frontend Token Request
 app.get('/api/maps/token', (req, res) => {
     try {
-        // FIX: If 'Origin' is missing (which happens on Railway internal requests), check 'Host'
+        // Smart Domain Detection for Railway vs Live
         let requestDomain = req.headers.origin || req.headers.host || "";
+        const cleanDomain = requestDomain.replace(/^https?:\/\//, '').split(':')[0].replace(/\/$/, '');
         
-        // Clean the domain: Remove "https://", port numbers, and slashes
-        const cleanDomain = requestDomain
-            .replace(/^https?:\/\//, '')
-            .split(':')[0] 
-            .replace(/\/$/, '');
-
-        console.log(`[DEBUG] Identifying Token for Domain: ${cleanDomain}`);
-
-        // Select the correct pre-approved token
         let token = MAPS_TOKENS[cleanDomain];
-
-        // If no specific match found (e.g. admin.jocoexec.com), use the Wildcard token
-        if (!token) {
-            console.log(`[WARN] No exact match for ${cleanDomain}. Using Wildcard.`);
-            token = MAPS_TOKENS["default"];
-        }
+        if (!token) token = MAPS_TOKENS["default"]; // Fallback for localhost/admin
 
         res.json({ token });
     } catch (error) {
-        console.error("Map Token Error:", error);
         res.status(500).json({ error: "Token retrieval failed" });
     }
 });
 
-// Helper: For Server-Side Quote Calculation
-async function calculateDynamicQuote(vehicleType, pickupCoords, dropoffCoords) {
+// Logic: Calculate Price based on FRONTEND PROVIDED Distance
+function calculatePrice(vehicleType, distanceMiles) {
     const config = PRICING_CONFIG[vehicleType];
     if (!config) throw new Error(`Pricing not configured for: ${vehicleType}`);
 
-    try {
-        // FORCE 'www' token for server calculations because we know it's valid
-        const serverToken = MAPS_TOKENS["www.jocoexec.com"];
-        
-        const url = `https://maps-api.apple.com/v1/etas?origin=${pickupCoords.latitude},${pickupCoords.longitude}&destinations=${dropoffCoords.latitude},${dropoffCoords.longitude}&transportType=Automobile`;
-        
-        // FIX: Spoof the Origin header so Apple accepts the request from the server
-        const response = await axios.get(url, { 
-            headers: { 
-                'Authorization': `Bearer ${serverToken}`,
-                'Origin': 'https://www.jocoexec.com' 
-            } 
-        });
-        
-        if (!response.data.etas || response.data.etas.length === 0) throw new Error("No route found");
+    const miles = parseFloat(distanceMiles || 0);
+    const mileageTotal = miles * config.perMileRate;
+    
+    // Returns the higher of Base Rate vs Mileage Rate
+    const finalQuote = Math.max(config.baseRate, mileageTotal);
 
-        const distanceMeters = response.data.etas[0].distanceMeters; 
-        const distanceInMiles = distanceMeters / 1609.34;
-        const mileageTotal = distanceInMiles * config.perMileRate;
-        
-        const finalQuote = Math.max(config.baseRate, mileageTotal);
-
-        return {
-            quote: parseFloat(finalQuote.toFixed(2)),
-            distance: distanceInMiles.toFixed(2),
-            method: mileageTotal > config.baseRate ? "Mileage Rate Applied" : "Minimum Base Rate Applied"
-        };
-    } catch (error) { 
-        console.error("Apple Maps API Detail:", error.response?.data || error.message);
-        return { quote: config.baseRate, distance: "0.00", error: "Distance calculation failed" }; 
-    }
+    return {
+        quote: parseFloat(finalQuote.toFixed(2)),
+        distance: miles.toFixed(2),
+        method: mileageTotal > config.baseRate ? "Mileage Rate" : "Base Rate"
+    };
 }
 
 // ==========================================
@@ -171,10 +130,11 @@ app.post('/api/check-availability', (req, res) => {
     }
 });
 
-app.post('/api/get-quote', async (req, res) => {
-    const { vehicleType, pickup, dropoff } = req.body;
+app.post('/api/get-quote', (req, res) => {
+    // FIX: Receive distance from frontend, do not call Apple
+    const { vehicleType, distance } = req.body;
     try {
-        const result = await calculateDynamicQuote(vehicleType, pickup, dropoff);
+        const result = calculatePrice(vehicleType, distance);
         res.json(result);
     } catch (e) {
         res.status(400).json({ error: e.message });
@@ -220,9 +180,12 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 app.post('/api/process-payment', async (req, res) => {
-    const { sourceId, vehicleType, pickup, dropoff, bookingDetails } = req.body;
+    const { sourceId, vehicleType, bookingDetails } = req.body;
     try {
-        let pricing = await calculateDynamicQuote(vehicleType, pickup, dropoff);
+        // FIX: Use the distance already calculated by the frontend
+        const distance = bookingDetails.distance || 0;
+        let pricing = calculatePrice(vehicleType, distance);
+        
         let amountInCents = BigInt(Math.round(pricing.quote * 100));
 
         if (bookingDetails && bookingDetails.meetAndGreet) {
@@ -296,14 +259,12 @@ if (fs.existsSync(clientBuildPath)) {
     app.use(express.static(rootBuildPath));
 }
 
-// 2. API 404 Handler - Important!
-// Matches anything starting with /api that wasn't handled above
+// 2. API 404 Handler
 app.use('/api', (req, res) => {
     res.status(404).json({ error: "API route not found" });
 });
 
 // 3. React Router Catch-All
-// Matches EVERYTHING else (i.e. frontend routes)
 app.use((req, res) => {
     const target = fs.existsSync(clientBuildPath) ? clientBuildPath : rootBuildPath;
     res.sendFile(path.join(target, 'index.html'));
