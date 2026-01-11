@@ -33,7 +33,7 @@ const Home = () => {
       <div className="hero">
         <div className="hero-overlay" style={{ padding: '0 20px' }}>
           <h1 style={heroTitleStyle}>Johnson County Executive Transportation</h1>
-          <p style={heroSubtitleStyle}>Premier Limo Service in the Kansas City Metropolitan Area</p>
+          <p style={heroSubtitleStyle}>Premier Chauffer Service in the Kansas City Metropolitan Area</p>
           <div style={heroBtnContainer}>
             <Link to="/booking" className="btn-primary" style={mobileFullWidthBtn}>Book a Ride</Link>
             <button onClick={scrollToRates} className="btn-outline" style={mobileOutlineBtn}>View Rates</button>

@@ -6,6 +6,7 @@ const express = require('express');
 const mongoose = require('mongoose'); // DATABASE DRIVER
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken'); 
@@ -52,7 +53,10 @@ const BookingSchema = new mongoose.Schema({
     vehicleType: String,
     pickup: String,
     dropoff: String,
-    stops: [Object], // [{ address: "...", coords: {...} }]
+    // --- NEW FIELD ---
+    flightNumber: String,
+    // -----------------
+    stops: [Object], 
     pickupCoords: Object,
     dropoffCoords: Object,
     date: String,

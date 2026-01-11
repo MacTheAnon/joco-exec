@@ -83,6 +83,34 @@ const DriverDashboard = () => {
                   <p style={{ margin: 0 }}>🏁 {job.dropoff}</p>
                 </div>
 
+                {/* LIVE FLIGHT TRACKING BUTTON */}
+                {job.flightNumber && (
+                  <div style={{ marginBottom: '15px' }}>
+                    <p style={{ margin: '5px 0', color: '#888', fontSize: '0.85rem' }}>
+                      ✈️ Flight: <strong>{job.flightNumber}</strong>
+                    </p>
+                    <a 
+                      href={`https://flightaware.com/live/flight/${job.flightNumber}`}
+                      target="_blank" 
+                      rel="noreferrer"
+                      style={{
+                        display: 'block', 
+                        background: '#333', 
+                        color: '#fff', 
+                        textAlign: 'center', 
+                        padding: '10px', 
+                        borderRadius: '4px', 
+                        textDecoration: 'none', 
+                        fontSize: '0.9rem',
+                        marginTop: '5px',
+                        border: '1px solid #555'
+                      }}
+                    >
+                      📡 CHECK LIVE STATUS
+                    </a>
+                  </div>
+                )}
+
                 {/* APPLE MAPS NAVIGATION */}
                 <a 
                   href={`https://maps.apple.com/?daddr=${encodeURIComponent(job.pickup)}&dirflg=d`}

@@ -46,7 +46,8 @@ const Booking = () => {
   };
 
   return (
-    <div style={{ background: '#000', minHeight: '90vh', padding: '40px 20px', display: 'flex', justifyContent: 'center' }}>
+    // FIX: Reduced horizontal padding (20px 10px) prevents form overflow on mobile
+    <div style={{ background: '#000', minHeight: '90vh', padding: '20px 10px', display: 'flex', justifyContent: 'center' }}>
       <div style={{ width: '100%', maxWidth: '600px' }}>
         
         {/* STEP 1: BOOKING FORM */}

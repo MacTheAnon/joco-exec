@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Map, Marker } from 'mapkit-react';
 
 // --- API CONFIGURATION FOR MOBILE & WEB ---
-// This guarantees the app connects to the live server on mobile,
-// while using the environment variable if available.
 const API_BASE = process.env.REACT_APP_API_URL || 'https://www.jocoexec.com';
 
 const BookingForm = ({ onSubmit }) => {
@@ -17,7 +15,8 @@ const BookingForm = ({ onSubmit }) => {
     stops: [], // Array of { id, address, coords }
     isRoundTrip: false,
     returnTime: '',
-    hourlyDuration: 2
+    hourlyDuration: 2,
+    flightNumber: '' // <-- NEW FLIGHT TRACKING FIELD
   });
 
   const [mapToken, setMapToken] = useState(null);
@@ -299,6 +298,19 @@ const BookingForm = ({ onSubmit }) => {
             )}
         </div>
 
+        {/* FLIGHT NUMBER INPUT */}
+        <div style={inputGroupStyle}>
+            <label style={labelStyle}>Flight Number (For Airport Pickups)</label>
+            <input 
+                type="text" 
+                name="flightNumber" 
+                style={inputStyle} 
+                placeholder="e.g. AA1234 or DL505" 
+                value={formData.flightNumber}
+                onChange={handleChange} 
+            />
+        </div>
+
         {/* --- CONDITIONAL UI BASED ON SERVICE TYPE --- */}
         {formData.serviceType === 'distance' ? (
             <>
@@ -409,7 +421,19 @@ const BookingForm = ({ onSubmit }) => {
 };
 
 // --- STYLES (Optimized for Mobile) ---
-const formCardStyle = { background: '#111', border: '1px solid #C5A059', padding: '25px', borderRadius: '12px', maxWidth: '550px', width: '100%', margin: '0 auto', color: '#fff', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', boxSizing: 'border-box', position: 'relative'};
+const formCardStyle = { 
+  background: '#111', 
+  border: '1px solid #C5A059', 
+  padding: '20px', // Reduced padding for mobile
+  borderRadius: '12px', 
+  width: '100%', // Takes full width of parent
+  maxWidth: '550px', // But never wider than 550px
+  margin: '0 auto', 
+  color: '#fff', 
+  boxShadow: '0 20px 50px rgba(0,0,0,0.5)', 
+  boxSizing: 'border-box', // Critical for fitting borders
+  position: 'relative'
+};
 const dropdownStyle = { position: 'absolute', zIndex: 9999, background: '#000', border: '1px solid #C5A059', borderRadius: '4px', width: '100%', marginTop: '0', maxHeight: '200px', overflowY: 'auto' };
 const dropdownItemStyle = { padding: '15px', cursor: 'pointer', borderBottom: '1px solid #222', fontSize: '1rem', color: '#fff', background: '#000' };
 const headerTitleStyle = { color: '#C5A059', marginTop: 0, fontSize: '1.8rem', fontFamily: '"Playfair Display", serif', marginBottom: '5px'};
