@@ -27,20 +27,14 @@ jobs:
           npm install @capacitor/ios
           npx cap sync ios 
 
-      - name: Build IPA
+          - name: Build IPA
         uses: yukiarrr/ios-build-action@v1.5.0
         with:
-          project-path: ios/App/App.xcodeproj
+          project-path: ios/App/App.xcodeproj  # Pointing to the project file
           p12-base64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
           p12-password: ${{ secrets.P12_PASSWORD }}
           mobileprovision-base64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
           code-signing-identity: "iPhone Distribution"
           team-id: "827CZWJ6A7"
-          workspace-path: ios/App/App.xcworkspace
-          export-method: "ad-hoc" 
-
-      - name: Upload IPA
-        uses: actions/upload-artifact@v4 
-        with:
-          name: joco-exec-app
-          path: output.ipa
+          export-method: "ad-hoc"
+          output-path: "output.ipa"
