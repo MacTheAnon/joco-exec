@@ -37,12 +37,12 @@ jobs:
           p12-base64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
           p12-password: ${{ secrets.P12_PASSWORD }}
           mobileprovision-base64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
-          # Use "Apple Development" or "iPhone Developer" depending on your .p12
-          code-signing-identity: "Apple Development" 
+          # UPDATED to match your log error exactly
+          code-signing-identity: "iOS Development" 
           team-id: "827CZWJ6A7"
-          export-method: "development" # REQUIRED for development profiles
+          export-method: "development"
           output-path: "output.ipa"
-
+          
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
