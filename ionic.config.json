@@ -1,0 +1,9 @@
+{
+  "name": "joco-exec",
+  "integrations": {
+    "capacitor": {
+      "iosPath": "ios/App"
+    }
+  },
+  "type": "react"
+}
