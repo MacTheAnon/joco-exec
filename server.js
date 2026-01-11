@@ -75,7 +75,6 @@ const saveUser = (u) => {
 // 3. APPLE MAPS INTEGRATION (TOKEN DELIVERY ONLY)
 // ==========================================
 
-// These are your valid, pre-approved tokens.
 const MAPS_TOKENS = {
     "www.jocoexec.com": "eyJraWQiOiI2VTgySkZDNlhUIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg0NjQ4LCJvcmlnaW4iOiJ3d3cuam9jb2V4ZWMuY29tIn0.-gPvMZbjh6DKKeTbEZP0QRgaEkxfA1X1jcO3ZZPenAzhhOd9t_gsBzaOxnGGTUaPQkl-2XbxoNpKOva-B8ZRCw",
     "jocoexec.com": "eyJraWQiOiJZTDIyTEM2NlYyIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg0NjQ4LCJvcmlnaW4iOiJqb2NvZXhlYy5jb20ifQ.661L0KfLEy9eNS8BucF-ZIGSaILZc3JXnhFoP1SvvniHUcZVL2YiyRIXxboashR6rtnjnxoeD5ZhG9Itu8va4w",
@@ -85,13 +84,9 @@ const MAPS_TOKENS = {
 
 app.get('/api/maps/token', (req, res) => {
     try {
-        // Smart Domain Detection for Railway vs Live
         let requestDomain = req.headers.origin || req.headers.host || "";
         const cleanDomain = requestDomain.replace(/^https?:\/\//, '').split(':')[0].replace(/\/$/, '');
-        
-        let token = MAPS_TOKENS[cleanDomain];
-        if (!token) token = MAPS_TOKENS["default"]; // Fallback for localhost/admin
-
+        let token = MAPS_TOKENS[cleanDomain] || MAPS_TOKENS["default"];
         res.json({ token });
     } catch (error) {
         res.status(500).json({ error: "Token retrieval failed" });
@@ -130,8 +125,8 @@ app.post('/api/check-availability', (req, res) => {
     }
 });
 
+// FIX: Receive distance from frontend, do not call Apple
 app.post('/api/get-quote', (req, res) => {
-    // FIX: Receive distance from frontend, do not call Apple
     const { vehicleType, distance } = req.body;
     try {
         const result = calculatePrice(vehicleType, distance);
@@ -252,25 +247,21 @@ app.delete('/api/admin/bookings/:id', (req, res) => {
 const clientBuildPath = path.join(__dirname, 'client', 'build');
 const rootBuildPath = path.join(__dirname, 'build');
 
-// 1. Serve Static Assets (JS, CSS, Images)
 if (fs.existsSync(clientBuildPath)) {
     app.use(express.static(clientBuildPath));
 } else if (fs.existsSync(rootBuildPath)) {
     app.use(express.static(rootBuildPath));
 }
 
-// 2. API 404 Handler
 app.use('/api', (req, res) => {
     res.status(404).json({ error: "API route not found" });
 });
 
-// 3. React Router Catch-All
 app.use((req, res) => {
     const target = fs.existsSync(clientBuildPath) ? clientBuildPath : rootBuildPath;
     res.sendFile(path.join(target, 'index.html'));
 });
 
-// START SERVER
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 JOCO EXEC Server Active`);
     console.log(`🚀 Port: ${PORT}`);

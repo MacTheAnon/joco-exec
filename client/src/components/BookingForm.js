@@ -17,7 +17,6 @@ const BookingForm = ({ onSubmit }) => {
 
   // --- 2. LIFECYCLE ---
   useEffect(() => {
-    // Fetch Token
     fetch('/api/maps/token')
       .then(res => res.json())
       .then(data => {
@@ -82,7 +81,7 @@ const BookingForm = ({ onSubmit }) => {
       transportType: window.mapkit.Directions.Transport.Automobile
     }, async (error, data) => {
       
-      // CRASH FIX 1: Handle MapKit Errors
+      // CRASH FIX: Handle MapKit Errors
       if (error) {
         setChecking(false);
         console.error("MapKit Route Error:", error);
@@ -90,7 +89,7 @@ const BookingForm = ({ onSubmit }) => {
         return;
       }
 
-      // CRASH FIX 2: Check if routes actually exist before reading
+      // CRASH FIX: Check if routes actually exist
       if (!data || !data.routes || data.routes.length === 0) {
         setChecking(false);
         alert("No route found between these locations.");
@@ -106,7 +105,7 @@ const BookingForm = ({ onSubmit }) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
               vehicleType: formData.vehicleType,
-              distance: distanceMiles 
+              distance: distanceMiles // Sending calculated distance
           }),
         });
         
