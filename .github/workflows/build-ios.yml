@@ -9,12 +9,13 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22 
+          node-version: 22
 
       - name: Install Dependencies
         run: npm install
@@ -25,7 +26,7 @@ jobs:
       - name: Sync Capacitor
         run: |
           npm install @capacitor/ios
-          npx cap sync ios 
+          npx cap sync ios
 
       - name: Setup Xcode and SDKs
         run: xcodebuild -downloadPlatform iOS
@@ -37,12 +38,11 @@ jobs:
           p12-base64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
           p12-password: ${{ secrets.P12_PASSWORD }}
           mobileprovision-base64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
-          # UPDATED to match your log error exactly
-          code-signing-identity: "iOS Development" 
+          code-signing-identity: "iOS Development"
           team-id: "827CZWJ6A7"
           export-method: "development"
           output-path: "output.ipa"
-          
+
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
