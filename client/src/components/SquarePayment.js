@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { PaymentForm, CreditCard } from 'react-square-web-payments-sdk';
 
+// --- API CONFIGURATION ---
+const API_BASE = process.env.REACT_APP_API_URL || 'https://www.jocoexec.com';
+
 const SquarePayment = ({ onSuccess, bookingDetails }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -38,10 +41,8 @@ const SquarePayment = ({ onSuccess, bookingDetails }) => {
         cardTokenizeResponseReceived={async (token) => {
           setIsSubmitting(true);
           try {
-            // Updated to use the consistent production URL
-            const apiUrl = process.env.REACT_APP_API_URL || 'https://www.jocoexec.com';
-            
-            const response = await fetch(`${apiUrl}/api/process-payment`, {
+            // ✅ Updated to use dynamic API_BASE
+            const response = await fetch(`${API_BASE}/api/process-payment`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 

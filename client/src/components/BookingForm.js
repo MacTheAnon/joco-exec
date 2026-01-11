@@ -1,12 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { Map, Marker } from 'mapkit-react';
 
+// --- API CONFIGURATION FOR MOBILE & WEB ---
+// This guarantees the app connects to the live server on mobile,
+// while using the environment variable if available.
+const API_BASE = process.env.REACT_APP_API_URL || 'https://www.jocoexec.com';
+
 const BookingForm = ({ onSubmit }) => {
   // --- 1. STATE MANAGEMENT ---
   const [formData, setFormData] = useState({
     name: '', email: '', phone: '', date: '', time: '',
     pickup: '', dropoff: '', pickupCoords: null, dropoffCoords: null,
-    meetAndGreet: false, passengers: '1', vehicleType: 'Luxury Sedan' 
+    meetAndGreet: false, passengers: '1', vehicleType: 'Luxury Sedan',
+    // NEW FIELDS
+    serviceType: 'distance', // 'distance' or 'hourly'
+    stops: [], // Array of { id, address, coords }
+    isRoundTrip: false,
+    returnTime: '',
+    hourlyDuration: 2
   });
 
   const [mapToken, setMapToken] = useState(null);
@@ -14,10 +25,13 @@ const BookingForm = ({ onSubmit }) => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [pickupResults, setPickupResults] = useState([]);
   const [dropoffResults, setDropoffResults] = useState([]);
+  // New state for stop results
+  const [stopResults, setStopResults] = useState({});
 
   // --- 2. LIFECYCLE ---
   useEffect(() => {
-    fetch('/api/maps/token')
+    // UPDATED FETCH URL
+    fetch(`${API_BASE}/api/maps/token`)
       .then(res => res.json())
       .then(data => {
         if (data.token) setMapToken(data.token);
@@ -30,7 +44,7 @@ const BookingForm = ({ onSubmit }) => {
   }, []);
 
   // --- 3. APPLE MAPS LOGIC ---
-  const handleAddressSearch = (query, setResults) => {
+  const handleAddressSearch = (query, callback) => {
     if (!window.mapkit || query.length < 3) return;
     
     const region = new window.mapkit.CoordinateRegion(
@@ -40,7 +54,7 @@ const BookingForm = ({ onSubmit }) => {
     const search = new window.mapkit.Search({ region });
     
     search.autocomplete(query, (error, data) => {
-      if (!error) setResults(data.results);
+      if (!error) callback(data.results);
     });
   };
 
@@ -53,21 +67,84 @@ const BookingForm = ({ onSubmit }) => {
     setResults([]); 
   };
 
+  // --- NEW: STOP LOGIC ---
+  const addStop = () => {
+    setFormData({
+      ...formData,
+      stops: [...formData.stops, { id: Date.now(), address: '', coords: null }]
+    });
+  };
+
+  const removeStop = (id) => {
+    setFormData({
+      ...formData,
+      stops: formData.stops.filter(s => s.id !== id)
+    });
+  };
+
+  const handleStopSearch = (id, query) => {
+    const newStops = formData.stops.map(s => s.id === id ? { ...s, address: query } : s);
+    setFormData({ ...formData, stops: newStops });
+    
+    handleAddressSearch(query, (results) => {
+      setStopResults(prev => ({ ...prev, [id]: results }));
+    });
+  };
+
+  const handleSelectStop = (id, result) => {
+    const newStops = formData.stops.map(s => 
+      s.id === id ? { ...s, address: result.displayLines.join(', '), coords: result.coordinate } : s
+    );
+    setFormData({ ...formData, stops: newStops });
+    setStopResults(prev => ({ ...prev, [id]: [] }));
+  };
+
   const handleChange = (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     setFormData({ ...formData, [e.target.name]: value });
   };
 
-  // --- 4. SUBMISSION & CALCULATION (CRASH FIX) ---
+  // --- 4. SUBMISSION & CALCULATION ---
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.pickupCoords || !formData.dropoffCoords) {
-      alert("Please select addresses from the dropdown list.");
-      return;
-    }
     setChecking(true);
 
-    // Safety Check: Ensure MapKit is loaded
+    // LOGIC BRANCH 1: HOURLY BOOKING (No Map Route Needed)
+    if (formData.serviceType === 'hourly') {
+      // UPDATED FETCH URL
+      fetch(`${API_BASE}/api/get-quote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          vehicleType: formData.vehicleType,
+          serviceType: 'hourly',
+          duration: formData.hourlyDuration
+        }),
+      })
+      .then(res => res.json())
+      .then(quoteData => {
+        onSubmit({ 
+          ...formData, 
+          amount: Math.round(quoteData.quote * 100), 
+          distance: 'N/A (Hourly)',
+          quoteDetails: quoteData
+        }); 
+      })
+      .catch(err => {
+        console.error(err);
+        alert("Error calculating hourly price.");
+      })
+      .finally(() => setChecking(false));
+      return;
+    }
+
+    // LOGIC BRANCH 2: DISTANCE BOOKING (MapKit Route)
+    if (!formData.pickupCoords || !formData.dropoffCoords) {
+      alert("Please select addresses from the dropdown list.");
+      setChecking(false);
+      return;
+    }
+
     if (!window.mapkit) {
       alert("Map services are not fully loaded. Please refresh.");
       setChecking(false);
@@ -75,21 +152,26 @@ const BookingForm = ({ onSubmit }) => {
     }
 
     const directions = new window.mapkit.Directions();
+    
+    // Add Stops as Waypoints
+    const waypoints = formData.stops
+      .filter(s => s.coords)
+      .map(s => ({ coordinate: s.coords }));
+
     directions.route({
       origin: formData.pickupCoords,
       destination: formData.dropoffCoords,
+      waypoints: waypoints,
       transportType: window.mapkit.Directions.Transport.Automobile
     }, async (error, data) => {
       
-      // CRASH FIX: Handle MapKit Errors
       if (error) {
         setChecking(false);
         console.error("MapKit Route Error:", error);
-        alert("Could not calculate driving route. Please ensure locations are reachable by car.");
+        alert("Could not calculate driving route.");
         return;
       }
 
-      // CRASH FIX: Check if routes actually exist
       if (!data || !data.routes || data.routes.length === 0) {
         setChecking(false);
         alert("No route found between these locations.");
@@ -100,12 +182,15 @@ const BookingForm = ({ onSubmit }) => {
       const distanceMiles = distanceMeters / 1609.34;
 
       try {
-        const quoteRes = await fetch('/api/get-quote', {
+        // UPDATED FETCH URL
+        const quoteRes = await fetch(`${API_BASE}/api/get-quote`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
               vehicleType: formData.vehicleType,
-              distance: distanceMiles // Sending calculated distance
+              serviceType: 'distance',
+              distance: distanceMiles,
+              isRoundTrip: formData.isRoundTrip
           }),
         });
         
@@ -116,7 +201,8 @@ const BookingForm = ({ onSubmit }) => {
         onSubmit({ 
             ...formData, 
             amount: Math.round(quoteData.quote * 100), 
-            distance: quoteData.distance 
+            distance: quoteData.distance,
+            quoteDetails: quoteData
         }); 
 
       } catch (err) {
@@ -158,6 +244,15 @@ const BookingForm = ({ onSubmit }) => {
            <div style={{ flex: 1 }}><label style={labelStyle}>Phone</label><input type="tel" name="phone" style={inputStyle} onChange={handleChange} required /></div>
         </div>
 
+        {/* --- NEW: Service Type Selector --- */}
+        <div style={inputGroupStyle}>
+            <label style={labelStyle}>Service Type</label>
+            <select name="serviceType" style={inputStyle} onChange={handleChange} value={formData.serviceType}>
+                <option value="distance">Point-to-Point / Round Trip</option>
+                <option value="hourly">Hourly (Night Out)</option>
+            </select>
+        </div>
+
         <div style={inputGroupStyle}>
             <label style={labelStyle}>Vehicle Type</label>
             <select name="vehicleType" style={inputStyle} onChange={handleChange} value={formData.vehicleType}>
@@ -172,7 +267,7 @@ const BookingForm = ({ onSubmit }) => {
           <div style={{ flex: 1 }}><label style={labelStyle}>Time</label><input type="time" name="time" style={inputStyle} onChange={handleChange} required /></div>
         </div>
 
-        {/* PICKUP INPUT - WITH MOBILE TOUCH FIX */}
+        {/* PICKUP INPUT */}
         <div style={inputGroupStyle}>
             <label style={labelStyle}>Pickup Location</label>
             <input 
@@ -196,7 +291,6 @@ const BookingForm = ({ onSubmit }) => {
                       e.preventDefault(); 
                       handleSelectAddress(res, 'pickup', setPickupResults);
                     }}
-                    onClick={() => handleSelectAddress(res, 'pickup', setPickupResults)}
                   >
                     {res.displayLines.join(', ')}
                   </div>
@@ -205,38 +299,99 @@ const BookingForm = ({ onSubmit }) => {
             )}
         </div>
 
-        {/* DROPOFF INPUT - WITH MOBILE TOUCH FIX */}
-        <div style={inputGroupStyle}>
-            <label style={labelStyle}>Dropoff Destination</label>
-            <input 
-                type="text" 
-                style={inputStyle} 
-                placeholder="Start typing dropoff address..." 
-                value={formData.dropoff}
-                onChange={(e) => { 
-                  setFormData({...formData, dropoff: e.target.value}); 
-                  handleAddressSearch(e.target.value, setDropoffResults); 
-                }}
-                required 
-            />
-            {dropoffResults.length > 0 && (
-              <div style={dropdownStyle}>
-                {dropoffResults.map(res => (
-                  <div 
-                    key={res.id} 
-                    style={dropdownItemStyle} 
-                    onMouseDown={(e) => {
-                      e.preventDefault(); 
-                      handleSelectAddress(res, 'dropoff', setDropoffResults);
-                    }}
-                    onClick={() => handleSelectAddress(res, 'dropoff', setDropoffResults)}
-                  >
-                    {res.displayLines.join(', ')}
-                  </div>
+        {/* --- CONDITIONAL UI BASED ON SERVICE TYPE --- */}
+        {formData.serviceType === 'distance' ? (
+            <>
+                {/* STOPS UI */}
+                {formData.stops.map((stop, index) => (
+                    <div key={stop.id} style={inputGroupStyle}>
+                        <div style={{display: 'flex', justifyContent:'space-between'}}>
+                             <label style={labelStyle}>Stop #{index + 1}</label>
+                             <span onClick={() => removeStop(stop.id)} style={{color: 'red', cursor: 'pointer', fontSize:'0.8rem'}}>REMOVE</span>
+                        </div>
+                        <input 
+                            type="text" 
+                            style={inputStyle} 
+                            placeholder="Add stop address..." 
+                            value={stop.address}
+                            onChange={(e) => handleStopSearch(stop.id, e.target.value)}
+                        />
+                        {stopResults[stop.id] && stopResults[stop.id].length > 0 && (
+                            <div style={dropdownStyle}>
+                                {stopResults[stop.id].map(res => (
+                                    <div key={res.id} style={dropdownItemStyle} onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        handleSelectStop(stop.id, res);
+                                    }}>
+                                        {res.displayLines.join(', ')}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 ))}
-              </div>
-            )}
-        </div>
+                
+                <button type="button" onClick={addStop} style={{...activeButtonStyle, background: '#333', color: '#C5A059', marginBottom: '20px'}}>+ Add Stop</button>
+
+                {/* DROPOFF INPUT */}
+                <div style={inputGroupStyle}>
+                    <label style={labelStyle}>Dropoff Destination</label>
+                    <input 
+                        type="text" 
+                        style={inputStyle} 
+                        placeholder="Start typing dropoff address..." 
+                        value={formData.dropoff}
+                        onChange={(e) => { 
+                          setFormData({...formData, dropoff: e.target.value}); 
+                          handleAddressSearch(e.target.value, setDropoffResults); 
+                        }}
+                        required 
+                    />
+                    {dropoffResults.length > 0 && (
+                      <div style={dropdownStyle}>
+                        {dropoffResults.map(res => (
+                          <div 
+                            key={res.id} 
+                            style={dropdownItemStyle} 
+                            onMouseDown={(e) => {
+                              e.preventDefault(); 
+                              handleSelectAddress(res, 'dropoff', setDropoffResults);
+                            }}
+                          >
+                            {res.displayLines.join(', ')}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                </div>
+
+                {/* ROUND TRIP TOGGLE */}
+                <div style={checkboxContainerStyle}>
+                  <label style={checkboxLabelStyle}>
+                    <input type="checkbox" name="isRoundTrip" checked={formData.isRoundTrip} onChange={handleChange} style={checkboxStyle} />
+                    <span>Book Round Trip? (Return to Pickup)</span>
+                  </label>
+                </div>
+
+                {formData.isRoundTrip && (
+                    <div style={inputGroupStyle}>
+                        <label style={labelStyle}>Return Pickup Time</label>
+                        <input type="datetime-local" name="returnTime" style={inputStyle} onChange={handleChange} required />
+                    </div>
+                )}
+            </>
+        ) : (
+            // HOURLY DURATION SELECTOR
+            <div style={inputGroupStyle}>
+                <label style={labelStyle}>Duration (Hours)</label>
+                <select name="hourlyDuration" style={inputStyle} onChange={handleChange} value={formData.hourlyDuration}>
+                    {[2, 3, 4, 5, 6, 7, 8, 10, 12].map(h => (
+                        <option key={h} value={h}>{h} Hours</option>
+                    ))}
+                </select>
+                <p style={{color: '#999', fontSize: '0.9rem', marginTop: '10px'}}>Driver will be at your disposal for the selected duration.</p>
+            </div>
+        )}
 
         <div style={checkboxContainerStyle}>
           <label style={checkboxLabelStyle}>

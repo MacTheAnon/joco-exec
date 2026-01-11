@@ -3,9 +3,9 @@
 // ==========================================
 const { SquareClient, SquareEnvironment } = require('square');
 const express = require('express');
+const mongoose = require('mongoose'); // DATABASE DRIVER
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken'); 
@@ -19,15 +19,67 @@ BigInt.prototype.toJSON = function() { return this.toString(); };
 const PORT = process.env.PORT || 8080;
 const SECRET_KEY = process.env.JWT_SECRET || 'joco-executive-transportation-secret';
 
-// --- FILE PATHS ---
-const DB_FILE = path.join(__dirname, 'bookings.json');
-const USERS_FILE = path.join(__dirname, 'users.json');
+// --- DATABASE CONNECTION ---
+mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/joco_db')
+  .then(() => console.log("✅ Connected to MongoDB Cloud"))
+  .catch(err => console.error("❌ MongoDB Connection Error:", err));
+
+// ==========================================
+// 2. DATABASE SCHEMAS (MODELS)
+// ==========================================
+
+// USER MODEL (Drivers & Customers)
+const UserSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    username: { type: String, unique: true, sparse: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    phone: String,
+    role: { type: String, enum: ['customer', 'driver', 'admin'], default: 'customer' },
+    isApproved: { type: Boolean, default: false }, // Drivers need approval
+    createdAt: { type: Date, default: Date.now }
+});
+const User = mongoose.model('User', UserSchema);
+
+// BOOKING MODEL
+const BookingSchema = new mongoose.Schema({
+    squarePaymentId: String,
+    userId: String, // Link to User ID
+    name: String,
+    email: String,
+    phone: String,
+    serviceType: { type: String, enum: ['distance', 'hourly'], default: 'distance' },
+    vehicleType: String,
+    pickup: String,
+    dropoff: String,
+    stops: [Object], // [{ address: "...", coords: {...} }]
+    pickupCoords: Object,
+    dropoffCoords: Object,
+    date: String,
+    time: String,
+    distance: String,
+    duration: Number, // For hourly
+    isRoundTrip: { type: Boolean, default: false },
+    returnTime: Date,
+    meetAndGreet: Boolean,
+    totalCharged: Number, // Stored in Cents
+    status: { type: String, default: 'PAID' }, // PAID, ASSIGNED, COMPLETED, CANCELLED
+    driverId: String, // Assigned Driver
+    driverLocation: {
+        lat: Number,
+        lng: Number,
+        heading: Number,
+        updatedAt: Date
+    },
+    bookedAt: { type: Date, default: Date.now }
+});
+const Booking = mongoose.model('Booking', BookingSchema);
 
 // --- PRICING CONFIGURATION ---
 const PRICING_CONFIG = {
-    'Luxury Sedan':  { baseRate: 85,  perMileRate: 3.00 },
-    'Luxury SUV':    { baseRate: 95,  perMileRate: 4.50 },
-    'Night Out':     { baseRate: 150, perMileRate: 4.50 } 
+    'Luxury Sedan':  { baseRate: 85,  perMileRate: 3.00, hourlyRate: 75 },
+    'Luxury SUV':    { baseRate: 95,  perMileRate: 4.50, hourlyRate: 95 },
+    'Night Out':     { baseRate: 150, perMileRate: 4.50, hourlyRate: 125 } 
 };
 
 const app = express();
@@ -49,38 +101,50 @@ const transporter = nodemailer.createTransport({
 const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_TOKEN);
 
 // ==========================================
-// 2. DATA UTILITIES
-// ==========================================
-const getBookings = () => {
-    if (!fs.existsSync(DB_FILE)) fs.writeFileSync(DB_FILE, '[]');
-    return JSON.parse(fs.readFileSync(DB_FILE, 'utf8') || '[]');
-};
-
-const saveBooking = (b) => {
-    const current = getBookings();
-    fs.writeFileSync(DB_FILE, JSON.stringify([...current, b], null, 2));
-};
-
-const getUsers = () => {
-    if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, '[]');
-    return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8') || '[]');
-};
-
-const saveUser = (u) => {
-    const current = getUsers();
-    fs.writeFileSync(USERS_FILE, JSON.stringify([...current, u], null, 2));
-};
-
-// ==========================================
-// 3. APPLE MAPS INTEGRATION (TOKEN DELIVERY ONLY)
+// 3. UTILITIES
 // ==========================================
 
+// Updated Pricing Logic
+function calculatePrice(vehicleType, distanceMiles, serviceType, duration, isRoundTrip) {
+    const config = PRICING_CONFIG[vehicleType];
+    if (!config) throw new Error(`Pricing not configured for: ${vehicleType}`);
+
+    // HOURLY LOGIC
+    if (serviceType === 'hourly') {
+        const hours = parseFloat(duration || 2);
+        const hourlyTotal = hours * config.hourlyRate;
+        return {
+            quote: parseFloat(hourlyTotal.toFixed(2)),
+            distance: 0,
+            method: `Hourly Rate (${hours} hrs @ $${config.hourlyRate}/hr)`
+        };
+    }
+
+    // DISTANCE LOGIC
+    const miles = parseFloat(distanceMiles || 0);
+    let mileageTotal = miles * config.perMileRate;
+    let finalQuote = Math.max(config.baseRate, mileageTotal);
+
+    if (isRoundTrip) {
+        finalQuote = finalQuote * 1.8; // Round trip discount
+    }
+
+    return {
+        quote: parseFloat(finalQuote.toFixed(2)),
+        distance: miles.toFixed(2),
+        method: mileageTotal > config.baseRate ? "Mileage Rate" : "Base Rate"
+    };
+}
+
+// Apple Maps Tokens
 const MAPS_TOKENS = {
     "www.jocoexec.com": "eyJraWQiOiI2VTgySkZDNlhUIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg0NjQ4LCJvcmlnaW4iOiJ3d3cuam9jb2V4ZWMuY29tIn0.-gPvMZbjh6DKKeTbEZP0QRgaEkxfA1X1jcO3ZZPenAzhhOd9t_gsBzaOxnGGTUaPQkl-2XbxoNpKOva-B8ZRCw",
-    "jocoexec.com": "eyJraWQiOiJZTDIyTEM2NlYyIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg0NjQ4LCJvcmlnaW4iOiJqb2NvZXhlYy5jb20ifQ.661L0KfLEy9eNS8BucF-ZIGSaILZc3JXnhFoP1SvvniHUcZVL2YiyRIXxboashR6rtnjnxoeD5ZhG9Itu8va4w",
-    "joco-exec.up.railway.app": "eyJraWQiOiI2Njc5N0hUNlQ0IiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg0NjQ4LCJvcmlnaW4iOiJqb2NvLWV4ZWMudXAucmFpbHdheS5hcHAifQ.-MpV0iYJQyMKN5NmIB1JFJj6eQcoE0B114XN1dK11jcISly8JluOfKvJ98ia1vToRhvhmhj3SPhzJ7Z_XUTb9g",
     "default": "eyJraWQiOiJTVDZIRzI5SDJBIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiI4MjdDWldKNkE3IiwiaWF0IjoxNzY4MDg2NTA3LCJvcmlnaW4iOiIqLmpvY29leGVjLmNvbSJ9.in54tp2O2ZteVBOVkY2jUExdZ4o691DKx_UsMTlRU5XVeZOg8br4XCMDYsF_NrK8le2elwOGSHTh6dnEBJl2_A"
 };
+
+// ==========================================
+// 4. API ROUTES
+// ==========================================
 
 app.get('/api/maps/token', (req, res) => {
     try {
@@ -93,46 +157,47 @@ app.get('/api/maps/token', (req, res) => {
     }
 });
 
-// Logic: Calculate Price based on FRONTEND PROVIDED Distance
-function calculatePrice(vehicleType, distanceMiles) {
-    const config = PRICING_CONFIG[vehicleType];
-    if (!config) throw new Error(`Pricing not configured for: ${vehicleType}`);
-
-    const miles = parseFloat(distanceMiles || 0);
-    const mileageTotal = miles * config.perMileRate;
-    
-    // Returns the higher of Base Rate vs Mileage Rate
-    const finalQuote = Math.max(config.baseRate, mileageTotal);
-
-    return {
-        quote: parseFloat(finalQuote.toFixed(2)),
-        distance: miles.toFixed(2),
-        method: mileageTotal > config.baseRate ? "Mileage Rate" : "Base Rate"
-    };
-}
-
-// ==========================================
-// 4. API ROUTES
-// ==========================================
-
-app.post('/api/check-availability', (req, res) => {
+app.post('/api/check-availability', async (req, res) => {
     try {
         const { date, time } = req.body;
-        const isTaken = getBookings().some(b => b.date === date && b.time === time);
-        res.json({ available: !isTaken });
+        // Check MongoDB for existing booking
+        const conflict = await Booking.findOne({ date, time, status: { $ne: 'CANCELLED' } });
+        res.json({ available: !conflict });
     } catch (err) {
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
 
-// FIX: Receive distance from frontend, do not call Apple
 app.post('/api/get-quote', (req, res) => {
-    const { vehicleType, distance } = req.body;
+    const { vehicleType, distance, serviceType, duration, isRoundTrip } = req.body;
     try {
-        const result = calculatePrice(vehicleType, distance);
+        const result = calculatePrice(vehicleType, distance, serviceType, duration, isRoundTrip);
         res.json(result);
     } catch (e) {
         res.status(400).json({ error: e.message });
+    }
+});
+
+// --- AUTHENTICATION ROUTES (MONGODB) ---
+
+app.post('/api/auth/register', async (req, res) => {
+    const { name, username, email, password, role } = req.body;
+    try {
+        const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+        if (existingUser) return res.status(400).json({ error: "User already exists." });
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newUser = await User.create({
+            name, username, email,
+            password: hashedPassword,
+            role: role || 'customer',
+            isApproved: role !== 'driver' 
+        });
+
+        const token = jwt.sign({ id: newUser._id, role: newUser.role }, SECRET_KEY, { expiresIn: '1d' });
+        res.json({ success: true, token, user: { name: newUser.name, role: newUser.role, isApproved: newUser.isApproved } });
+    } catch (e) {
+        res.status(500).json({ error: "Registration Failed" });
     }
 });
 
@@ -140,109 +205,117 @@ app.post('/api/auth/login', async (req, res) => {
     const { identifier, password } = req.body;
     const ADMIN_PASS = process.env.ADMIN_SECRET || 'JoC03x3c2026';
 
+    // Master Admin Override
     if ((identifier === 'kalebm.lord@gmail.com' || identifier === 'admin') && password === ADMIN_PASS) {
         const token = jwt.sign({ id: 'master-admin', role: 'admin' }, SECRET_KEY, { expiresIn: '1d' });
         return res.json({ token, user: { name: 'Master Admin', role: 'admin', isApproved: true } });
     }
 
-    const user = getUsers().find(u => u.email === identifier || u.username === identifier);
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-        return res.status(400).json({ error: "Invalid credentials" });
+    try {
+        const user = await User.findOne({ $or: [{ email: identifier }, { username: identifier }] });
+        if (!user || !(await bcrypt.compare(password, user.password))) {
+            return res.status(400).json({ error: "Invalid credentials" });
+        }
+
+        const token = jwt.sign({ id: user._id, role: user.role }, SECRET_KEY, { expiresIn: '1d' });
+        res.json({ token, user: { name: user.name, role: user.role, email: user.email, isApproved: user.isApproved } });
+    } catch (e) {
+        res.status(500).json({ error: "Login Error" });
     }
-    
-    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, SECRET_KEY, { expiresIn: '1d' });
-    res.json({ token, user: { name: user.name, role: user.role, email: user.email, isApproved: user.isApproved } });
 });
 
-app.post('/api/auth/register', async (req, res) => {
-    const { name, username, email, password, role } = req.body;
-    const users = getUsers();
-    if (users.find(u => u.email === email || u.username === username)) {
-        return res.status(400).json({ error: "User already exists." });
-    }
-    
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = { 
-        id: Date.now().toString(), 
-        name, username, email,
-        password: hashedPassword, role: role || 'customer',
-        isApproved: role !== 'driver' 
-    };
-    
-    saveUser(newUser);
-    const token = jwt.sign({ id: newUser.id, role: newUser.role }, SECRET_KEY, { expiresIn: '1d' });
-    res.json({ success: true, token, user: { name: newUser.name, role: newUser.role, email: newUser.email, isApproved: newUser.isApproved } });
-});
+// --- PAYMENT & BOOKING ROUTE ---
 
 app.post('/api/process-payment', async (req, res) => {
     const { sourceId, vehicleType, bookingDetails } = req.body;
     try {
-        // FIX: Use the distance already calculated by the frontend
-        const distance = bookingDetails.distance || 0;
-        let pricing = calculatePrice(vehicleType, distance);
+        const distance = bookingDetails.distance === 'N/A (Hourly)' ? 0 : bookingDetails.distance;
+        let pricing = calculatePrice(
+            vehicleType, 
+            distance, 
+            bookingDetails.serviceType, 
+            bookingDetails.hourlyDuration,
+            bookingDetails.isRoundTrip
+        );
         
         let amountInCents = BigInt(Math.round(pricing.quote * 100));
+        if (bookingDetails.meetAndGreet) amountInCents += BigInt(2500);
 
-        if (bookingDetails && bookingDetails.meetAndGreet) {
-            amountInCents += BigInt(2500); 
-        }
-
+        // 1. Process Square Payment
         const response = await squareClient.payments.create({
-            sourceId, idempotencyKey: Date.now().toString(), 
+            sourceId, idempotencyKey: `sq_${Date.now()}`, 
             amountMoney: { amount: amountInCents, currency: 'USD' }
         });
 
-        const newBooking = { 
-            id: response.result.payment.id, 
-            ...bookingDetails, 
+        // 2. Save to MongoDB
+        const newBooking = await Booking.create({
+            squarePaymentId: response.result.payment.id,
+            ...bookingDetails,
             totalCharged: Number(amountInCents),
-            status: 'PAID', driver: null, bookedAt: new Date() 
-        };
-        saveBooking(newBooking);
+            status: 'PAID',
+            bookedAt: new Date()
+        });
+
+        // 3. Notify Drivers
+        const drivers = await User.find({ role: 'driver', isApproved: true });
         
-        const drivers = getUsers().filter(u => u.role === 'driver' && u.isApproved);
-        drivers.forEach(async (driver) => {
+        drivers.forEach(driver => {
+            const jobDesc = bookingDetails.serviceType === 'hourly' 
+                ? `HOURLY: ${bookingDetails.hourlyDuration} Hours`
+                : `${bookingDetails.pickup} to ${bookingDetails.dropoff}`;
+
             transporter.sendMail({
                 from: `"JOCO EXEC" <${process.env.EMAIL_USER}>`, 
                 to: driver.email,
                 subject: `NEW JOB: ${newBooking.date}`,
-                html: `<p>New Job Available: ${newBooking.pickup} to ${newBooking.dropoff}</p><p>Fare: $${(Number(amountInCents)/100).toFixed(2)}</p>`
+                html: `<p>New Job: ${jobDesc}</p><p>Fare: $${(Number(amountInCents)/100).toFixed(2)}</p>`
             }).catch(e => console.error("Email Error:", e.message));
 
             if (process.env.TWILIO_PHONE) {
                 twilioClient.messages.create({
-                    body: `JOCO EXEC: New job on ${newBooking.date} from ${newBooking.pickup}.`,
+                    body: `JOCO EXEC: New job available. ${jobDesc}`,
                     from: process.env.TWILIO_PHONE,
-                    to: driver.phone || (process.env.DRIVER_EMAILS ? process.env.DRIVER_EMAILS.split(',')[0] : "")
+                    to: driver.phone
                 }).catch(e => console.error("SMS Error:", e.message));
             }
         });
 
         res.json({ success: true, paymentId: response.result.payment.id });
     } catch (e) { 
+        console.error(e);
         res.status(500).json({ error: e.message }); 
     }
 });
 
-app.get('/api/admin/bookings', (req, res) => res.json(getBookings()));
-app.get('/api/admin/users', (req, res) => res.json(getUsers()));
+// --- DRIVER TRACKING ---
+app.post('/api/driver/update-location', async (req, res) => {
+    const { bookingId, lat, lng, heading } = req.body;
+    try {
+        await Booking.findByIdAndUpdate(bookingId, {
+            driverLocation: { lat, lng, heading, updatedAt: new Date() }
+        });
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: "Update failed" });
+    }
+});
 
-app.post('/api/admin/approve-driver', (req, res) => {
-    const { email } = req.body;
-    const users = getUsers();
-    const updatedUsers = users.map(u => (u.email === email && u.role === 'driver') ? { ...u, isApproved: true } : u);
-    fs.writeFileSync(USERS_FILE, JSON.stringify(updatedUsers, null, 2));
+// --- ADMIN ROUTES ---
+app.get('/api/admin/bookings', async (req, res) => res.json(await Booking.find().sort({ bookedAt: -1 })));
+app.get('/api/admin/users', async (req, res) => res.json(await User.find()));
+
+app.post('/api/admin/approve-driver', async (req, res) => {
+    await User.findOneAndUpdate({ email: req.body.email }, { isApproved: true });
     res.json({ success: true });
 });
 
-app.delete('/api/admin/bookings/:id', (req, res) => {
-    const newBookings = getBookings().filter(b => b.id !== req.params.id);
-    fs.writeFileSync(DB_FILE, JSON.stringify(newBookings, null, 2));
+app.delete('/api/admin/bookings/:id', async (req, res) => {
+    await Booking.findByIdAndDelete(req.params.id);
     res.json({ success: true });
 });
 
 // ==========================================
-// 5. PRODUCTION STATIC SERVING
+// 5. PRODUCTION SERVING
 // ==========================================
 const clientBuildPath = path.join(__dirname, 'client', 'build');
 const rootBuildPath = path.join(__dirname, 'build');
@@ -253,9 +326,7 @@ if (fs.existsSync(clientBuildPath)) {
     app.use(express.static(rootBuildPath));
 }
 
-app.use('/api', (req, res) => {
-    res.status(404).json({ error: "API route not found" });
-});
+app.use('/api', (req, res) => res.status(404).json({ error: "API route not found" }));
 
 app.use((req, res) => {
     const target = fs.existsSync(clientBuildPath) ? clientBuildPath : rootBuildPath;
@@ -263,7 +334,6 @@ app.use((req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 JOCO EXEC Server Active`);
+    console.log(`🚀 JOCO EXEC Server Online (MongoDB Active)`);
     console.log(`🚀 Port: ${PORT}`);
-    console.log(`🚀 Pricing Engine: Online`);
 });

@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 
+// --- API CONFIGURATION ---
+const API_BASE = process.env.REACT_APP_API_URL || 'https://www.jocoexec.com';
+
 const Register = () => {
   // --- STATE MANAGEMENT ---
   const [formData, setFormData] = useState({ 
@@ -57,8 +60,8 @@ const Register = () => {
     setError('');
 
     try {
-      // ✅ PRODUCTION URL: https://www.jocoexec.com
-      const res = await fetch('https://www.jocoexec.com/api/auth/register', {
+      // ✅ UPDATED TO USE API_BASE VARIABLE
+      const res = await fetch(`${API_BASE}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)

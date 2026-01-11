@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 
+// --- API CONFIGURATION ---
+const API_BASE = process.env.REACT_APP_API_URL || 'https://www.jocoexec.com';
+
 const Login = ({ setUser }) => {
   // We use 'identifier' to capture either Email OR Username
   const [formData, setFormData] = useState({ 
@@ -26,8 +29,8 @@ const Login = ({ setUser }) => {
     setError('');
 
     try {
-      // ✅ PRODUCTION URL: https://www.jocoexec.com
-      const res = await fetch('https://www.jocoexec.com/api/auth/login', {
+      // ✅ Updated to use dynamic API_BASE
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -128,7 +131,7 @@ const Login = ({ setUser }) => {
             </p>
             <div style={{ marginTop: '10px' }}>
               <Link to="/" style={secondaryLinkStyle}>
-                &larr; Return Home
+                ← Return Home
               </Link>
             </div>
           </div>

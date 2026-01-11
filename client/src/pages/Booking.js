@@ -71,7 +71,7 @@ const Booking = () => {
                 onClick={() => setStep(1)} 
                 style={{ background: 'none', border: 'none', color: '#C5A059', cursor: 'pointer', textDecoration: 'underline', marginTop: '10px' }}
               >
-                &larr; Go Back to Edit Details
+                ← Go Back to Edit Details
               </button>
             </div>
             

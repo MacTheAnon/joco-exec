@@ -14,7 +14,7 @@ const Admin = () => {
   const [selectedMarker, setSelectedMarker] = useState(null);
 
   // --- API CONFIGURATION ---
-  const apiUrl = 'https://www.jocoexec.com';
+  const apiUrl = process.env.REACT_APP_API_URL || 'https://www.jocoexec.com';
   
   const fetchData = async (e) => {
     if (e) e.preventDefault();

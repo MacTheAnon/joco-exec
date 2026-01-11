@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Map, Marker } from 'mapkit-react';
 
+// --- API CONFIGURATION ---
+const API_BASE = process.env.REACT_APP_API_URL || 'https://www.jocoexec.com';
+
 const AdminMap = ({ bookings }) => {
   const [token, setToken] = useState(null);
   const [selected, setSelected] = useState(null);
 
   useEffect(() => {
-    // 1. Fetch the secure JWT using the new Universal Fix
-    fetch('/api/maps/token')
+    // 1. Fetch the secure JWT using the Universal URL
+    fetch(`${API_BASE}/api/maps/token`)
       .then(res => res.json())
       .then(data => {
         if (data.token) {

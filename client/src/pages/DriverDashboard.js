@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 
+// --- API CONFIGURATION ---
+const API_BASE = process.env.REACT_APP_API_URL || 'https://www.jocoexec.com';
+
 const DriverDashboard = () => {
   const [myJobs, setMyJobs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -10,8 +13,8 @@ const DriverDashboard = () => {
     const fetchJobs = async () => {
       try {
         const token = localStorage.getItem('token');
-        // Points to production domain
-        const res = await fetch('https://www.jocoexec.com/api/user/my-bookings', {
+        // Points to production domain via API_BASE
+        const res = await fetch(`${API_BASE}/api/user/my-bookings`, {
           headers: { 'Authorization': token }
         });
         
@@ -80,9 +83,7 @@ const DriverDashboard = () => {
                   <p style={{ margin: 0 }}>🏁 {job.dropoff}</p>
                 </div>
 
-                {/* REMOVED: googleusercontent/maps.google.com link
-                   ADDED: Standard Apple Maps URL Scheme for Navigation
-                */}
+                {/* APPLE MAPS NAVIGATION */}
                 <a 
                   href={`https://maps.apple.com/?daddr=${encodeURIComponent(job.pickup)}&dirflg=d`}
                   target="_blank" 
