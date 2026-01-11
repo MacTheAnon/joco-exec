@@ -12,9 +12,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Node.js
-        uses: actions/setup-node@v4 # Updated to v4 as well
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22 
 
       - name: Install Dependencies
         run: npm install
@@ -25,7 +25,7 @@ jobs:
       - name: Sync Capacitor
         run: |
           npm install @capacitor/ios
-          npx cap sync ios # Removed 'add' since the folder is already in your repo
+          npx cap sync ios 
 
       - name: Build IPA
         uses: yukiarrr/ios-build-action@v1.5.0
@@ -40,7 +40,7 @@ jobs:
           export-method: "ad-hoc" 
 
       - name: Upload IPA
-        uses: actions/upload-artifact@v4 # FIXED: Upgraded from v3 to v4
+        uses: actions/upload-artifact@v4 
         with:
           name: joco-exec-app
-          path: output.ipa # Note: Ensure your build action outputs to this filename
+          path: output.ipa
