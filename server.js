@@ -14,6 +14,7 @@ const twilio = require('twilio');
 require('dotenv').config();
 
 // --- BIGINT FIX ---
+// This prevents crashes if you ever try to print a BigInt to the console/JSON
 BigInt.prototype.toJSON = function() { return this.toString(); };
 
 // --- SERVER CONSTANTS ---
@@ -244,25 +245,30 @@ app.post('/api/process-payment', async (req, res) => {
             bookingDetails.isRoundTrip
         );
         
-        // ✅ SAFE MATH: Use Math.round() instead of BigInt
+        // ✅ STEP 1: SAFE MATH (Use regular Numbers so it doesn't crash)
+        // Math.round ensures we have a clean integer like 8500
         let amountInCents = Math.round(pricing.quote * 100);
 
-        // ✅ PRESERVED IF/THEN LOGIC: Add $25.00 for Meet & Greet
+        // ✅ STEP 2: PRESERVED IF/THEN LOGIC
+        // Add $25.00 (2500 cents) if Meet & Greet is selected
         if (bookingDetails.meetAndGreet) {
             amountInCents += 2500; 
         }
 
         // 2. Process Square Payment
+        // ⚠️ THE FIX: We convert to BigInt ONLY HERE inside the call.
+        // This satisfies Square's "Expected bigint" rule.
         const response = await squareClient.payments.create({
             sourceId, 
             idempotencyKey: `sq_${Date.now()}`, 
             amountMoney: { 
-                amount: amountInCents, // Sent as a clean Integer
+                amount: BigInt(amountInCents), // <--- THIS IS THE FIX
                 currency: 'USD' 
             }
         });
 
         // 3. Save to MongoDB
+        // We save 'amountInCents' (regular number) to the database for easier reading.
         const newBooking = await Booking.create({
             squarePaymentId: response.result.payment.id,
             ...bookingDetails,
@@ -298,8 +304,14 @@ app.post('/api/process-payment', async (req, res) => {
         res.json({ success: true, paymentId: response.result.payment.id });
 
     } catch (e) { 
-        console.error("PAYMENT ERROR:", e); // Updated logging
-        res.status(500).json({ error: e.message || "Payment Processing Failed" }); 
+        console.error("PAYMENT ERROR:", e); // This prints the detailed error if it fails
+        
+        // Send a readable error to the client
+        const errorMessage = e.result 
+            ? JSON.stringify(e.result.errors) 
+            : (e.message || "Payment Processing Failed");
+            
+        res.status(500).json({ error: errorMessage }); 
     }
 });
 
