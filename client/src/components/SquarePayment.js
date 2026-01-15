@@ -35,9 +35,10 @@ const SquarePayment = ({ onSuccess, bookingDetails }) => {
       </div>
 
       <PaymentForm
-        // Uses your existing Square credentials
-        applicationId="sq0idp-WEHQaoQdRnOWl_c8-GfXBg" 
-        locationId="LD7WCY7X0HQT4"
+        // ✅ NOW USES SECURE VARIABLES
+        applicationId={process.env.REACT_APP_SQUARE_APP_ID}
+        locationId={process.env.REACT_APP_SQUARE_LOCATION_ID}
+        
         cardTokenizeResponseReceived={async (token) => {
           setIsSubmitting(true);
           try {
@@ -47,7 +48,7 @@ const SquarePayment = ({ onSuccess, bookingDetails }) => {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 
                 sourceId: token.token,
-                // These details now come from Apple Maps inputs in the parent form
+                // These details pass the booking info to your server
                 vehicleType: bookingDetails.vehicleType, 
                 pickup: bookingDetails.pickup, 
                 dropoff: bookingDetails.dropoff,
