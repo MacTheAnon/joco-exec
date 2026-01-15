@@ -248,7 +248,7 @@ app.post('/api/process-payment', async (req, res) => {
         // 1. Process Square Payment
         const response = await squareClient.payments.create({
             sourceId, idempotencyKey: `sq_${Date.now()}`, 
-            amountMoney: { amount: amountInCents, currency: 'USD' }
+            amountMoney: { amount: Number(amountInCents), currency: 'USD' }
         });
 
         // 2. Save to MongoDB
