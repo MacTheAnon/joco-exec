@@ -234,6 +234,8 @@ app.post('/api/process-payment', async (req, res) => {
     const { sourceId, vehicleType, bookingDetails } = req.body;
     try {
         const distance = bookingDetails.distance === 'N/A (Hourly)' ? 0 : bookingDetails.distance;
+        
+        // 1. Calculate Price
         let pricing = calculatePrice(
             vehicleType, 
             distance, 
@@ -242,25 +244,34 @@ app.post('/api/process-payment', async (req, res) => {
             bookingDetails.isRoundTrip
         );
         
-        let amountInCents = BigInt(Math.round(pricing.quote * 100));
-        if (bookingDetails.meetAndGreet) amountInCents += BigInt(2500);
+        // ✅ SAFE MATH: Use Math.round() instead of BigInt
+        let amountInCents = Math.round(pricing.quote * 100);
 
-        // 1. Process Square Payment
+        // ✅ PRESERVED IF/THEN LOGIC: Add $25.00 for Meet & Greet
+        if (bookingDetails.meetAndGreet) {
+            amountInCents += 2500; 
+        }
+
+        // 2. Process Square Payment
         const response = await squareClient.payments.create({
-            sourceId, idempotencyKey: `sq_${Date.now()}`, 
-            amountMoney: { amount: Number(amountInCents), currency: 'USD' }
+            sourceId, 
+            idempotencyKey: `sq_${Date.now()}`, 
+            amountMoney: { 
+                amount: amountInCents, // Sent as a clean Integer
+                currency: 'USD' 
+            }
         });
 
-        // 2. Save to MongoDB
+        // 3. Save to MongoDB
         const newBooking = await Booking.create({
             squarePaymentId: response.result.payment.id,
             ...bookingDetails,
-            totalCharged: Number(amountInCents),
+            totalCharged: amountInCents,
             status: 'PAID',
             bookedAt: new Date()
         });
 
-        // 3. Notify Drivers
+        // 4. Notify Drivers
         const drivers = await User.find({ role: 'driver', isApproved: true });
         
         drivers.forEach(driver => {
@@ -272,7 +283,7 @@ app.post('/api/process-payment', async (req, res) => {
                 from: `"JOCO EXEC" <${process.env.EMAIL_USER}>`, 
                 to: driver.email,
                 subject: `NEW JOB: ${newBooking.date}`,
-                html: `<p>New Job: ${jobDesc}</p><p>Fare: $${(Number(amountInCents)/100).toFixed(2)}</p>`
+                html: `<p>New Job: ${jobDesc}</p><p>Fare: $${(amountInCents/100).toFixed(2)}</p>`
             }).catch(e => console.error("Email Error:", e.message));
 
             if (process.env.TWILIO_PHONE) {
@@ -285,9 +296,10 @@ app.post('/api/process-payment', async (req, res) => {
         });
 
         res.json({ success: true, paymentId: response.result.payment.id });
+
     } catch (e) { 
-        console.error(e);
-        res.status(500).json({ error: e.message }); 
+        console.error("PAYMENT ERROR:", e); // Updated logging
+        res.status(500).json({ error: e.message || "Payment Processing Failed" }); 
     }
 });
 
