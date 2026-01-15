@@ -13,9 +13,9 @@ const jwt = require('jsonwebtoken');
 const twilio = require('twilio'); 
 require('dotenv').config();
 
-// --- BIGINT FIX ---
-// ⚠️ CHANGED: Return Number(this) instead of this.toString()
-// This fixes the "EXPECTED_INTEGER" error from Square
+// --- 🔴 CRITICAL FIX 🔴 ---
+// We changed .toString() to Number(this).
+// This prevents the "EXPECTED_INTEGER" error from Square.
 BigInt.prototype.toJSON = function() { return Number(this); };
 
 // --- SERVER CONSTANTS ---
