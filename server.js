@@ -230,10 +230,13 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-// --- PAYMENT & BOOKING ROUTE ---
+// --- PAYMENT & BOOKING ROUTE (UPDATED FIX) ---
 
 app.post('/api/process-payment', async (req, res) => {
     const { sourceId, vehicleType, bookingDetails } = req.body;
+    
+    console.log("💳 Processing Payment for:", bookingDetails.email);
+
     try {
         const distance = bookingDetails.distance === 'N/A (Hourly)' ? 0 : bookingDetails.distance;
         
@@ -254,8 +257,9 @@ app.post('/api/process-payment', async (req, res) => {
             amountInCents += 2500; 
         }
 
+        console.log(`💰 Charge Amount: ${amountInCents} cents`);
+
         // 2. Process Square Payment
-        // We use BigInt() here for the SDK, but the toJSON helper ensures it sends as a Number
         const response = await squareClient.payments.create({
             sourceId, 
             idempotencyKey: `sq_${Date.now()}`, 
@@ -265,9 +269,33 @@ app.post('/api/process-payment', async (req, res) => {
             }
         });
 
+        // --- 🔍 DEBUGGING & SAFETY ---
+        console.log("✅ Square Response Keys:", Object.keys(response));
+        if (response.result) console.log("✅ Result Keys:", Object.keys(response.result));
+
+        // Safely extract the payment ID (Fix for "undefined" error)
+        let paymentId = null;
+        if (response.result && response.result.payment) {
+            paymentId = response.result.payment.id;
+        } else if (response.payment) {
+             paymentId = response.payment.id;
+        } else if (response.body && response.body.payment) {
+            paymentId = response.body.payment.id;
+        }
+
+        // If we still don't have an ID, log the full object so we can see why
+        if (!paymentId) {
+            console.error("⚠️ FULL RESPONSE (NO ID):", JSON.stringify(response, (key, value) =>
+                typeof value === 'bigint' ? value.toString() : value // Safe print for BigInt
+            , 2));
+            throw new Error("Payment succeeded but Payment ID is missing from response.");
+        }
+
+        console.log("✅ Payment ID Captured:", paymentId);
+
         // 3. Save to MongoDB
         const newBooking = await Booking.create({
-            squarePaymentId: response.result.payment.id,
+            squarePaymentId: paymentId, 
             ...bookingDetails,
             totalCharged: amountInCents,
             status: 'PAID',
@@ -298,14 +326,18 @@ app.post('/api/process-payment', async (req, res) => {
             }
         });
 
-        res.json({ success: true, paymentId: response.result.payment.id });
+        res.json({ success: true, paymentId: paymentId });
 
     } catch (e) { 
-        console.error("PAYMENT ERROR:", e); 
-        // Send a readable error to the client
-        const errorMessage = e.result 
-            ? JSON.stringify(e.result.errors) 
-            : (e.message || "Payment Processing Failed");
+        console.error("❌ PAYMENT FAILED:", e); 
+        
+        // Handle Square API Errors nicely
+        let errorMessage = "Payment Processing Failed";
+        if (e.result && e.result.errors) {
+            errorMessage = e.result.errors[0].detail || e.result.errors[0].code;
+        } else if (e.message) {
+            errorMessage = e.message;
+        }
             
         res.status(500).json({ error: errorMessage }); 
     }
