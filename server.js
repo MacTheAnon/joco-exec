@@ -302,30 +302,41 @@ app.post('/api/process-payment', async (req, res) => {
             bookedAt: new Date()
         });
 
-        // 4. Notify Drivers
-        const drivers = await User.find({ role: 'driver', isApproved: true });
-        
-        drivers.forEach(driver => {
-            const jobDesc = bookingDetails.serviceType === 'hourly' 
-                ? `HOURLY: ${bookingDetails.hourlyDuration} Hours`
-                : `${bookingDetails.pickup} to ${bookingDetails.dropoff}`;
+        // 4. Notify Drivers (SAFE VERSION)
+        // Wraps notifications in try/catch so one failure doesn't crash the whole response
+        try {
+            const drivers = await User.find({ role: 'driver', isApproved: true });
+            
+            drivers.forEach(driver => {
+                const jobDesc = bookingDetails.serviceType === 'hourly' 
+                    ? `HOURLY: ${bookingDetails.hourlyDuration} Hours`
+                    : `${bookingDetails.pickup} to ${bookingDetails.dropoff}`;
 
-            transporter.sendMail({
-                from: `"JOCO EXEC" <${process.env.EMAIL_USER}>`, 
-                to: driver.email,
-                subject: `NEW JOB: ${newBooking.date}`,
-                html: `<p>New Job: ${jobDesc}</p><p>Fare: $${(amountInCents/100).toFixed(2)}</p>`
-            }).catch(e => console.error("Email Error:", e.message));
+                // Email Notification (Safe catch)
+                transporter.sendMail({
+                    from: `"JOCO EXEC" <${process.env.EMAIL_USER}>`, 
+                    to: driver.email,
+                    subject: `NEW JOB: ${newBooking.date}`,
+                    html: `<p>New Job: ${jobDesc}</p><p>Fare: $${(amountInCents/100).toFixed(2)}</p>`
+                }).catch(e => console.error("⚠️ Email Warning:", e.message));
 
-            if (process.env.TWILIO_PHONE) {
-                twilioClient.messages.create({
-                    body: `JOCO EXEC: New job available. ${jobDesc}`,
-                    from: process.env.TWILIO_PHONE,
-                    to: driver.phone
-                }).catch(e => console.error("SMS Error:", e.message));
-            }
-        });
+                // SMS Notification (Only if phone exists + Safe catch)
+                if (process.env.TWILIO_PHONE && driver.phone) {
+                    twilioClient.messages.create({
+                        body: `JOCO EXEC: New job available. ${jobDesc}`,
+                        from: process.env.TWILIO_PHONE,
+                        to: driver.phone
+                    }).catch(e => console.error("⚠️ SMS Warning:", e.message));
+                } else {
+                    console.log(`ℹ️ Skipped SMS for ${driver.email} (No phone number)`);
+                }
+            });
+        } catch (notifyError) {
+            console.error("⚠️ Notification System Error:", notifyError);
+            // We do NOT re-throw the error here. We let the function finish so the user sees "Success"
+        }
 
+        // 5. Send Success Response
         res.json({ success: true, paymentId: paymentId });
 
     } catch (e) { 
