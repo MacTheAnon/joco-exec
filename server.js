@@ -91,6 +91,8 @@ const transporter = nodemailer.createTransport({
     tls: { rejectUnauthorized: false }
 });
 
+// --- ⚠️ HARDCODED CREDENTIALS (NUCLEAR FIX) ---
+// This bypasses Railway variables to rule out formatting errors.
 const twilioClient = twilio(
   "AC7d8f7e1f30d44152be1365d7398d918d", 
   "a7fd107f66469042a1ad6f3a1cc7c1fe"
@@ -161,11 +163,11 @@ app.post('/api/get-quote', (req, res) => {
 // --- AUTH ROUTES ---
 app.post('/api/auth/register', async (req, res) => {
     try {
-        const { name, username, email, password, role, phone } = req.body; // ✅ Added Phone
+        const { name, username, email, password, role, phone } = req.body; 
         if (await User.findOne({ $or: [{ email }, { username }] })) return res.status(400).json({ error: "User exists." });
         
         const newUser = await User.create({
-            name, username, email, phone, // ✅ Save Phone
+            name, username, email, phone, 
             password: await bcrypt.hash(password, 10),
             role: role || 'customer', isApproved: role !== 'driver'
         });
@@ -320,13 +322,14 @@ app.post('/api/admin/dispatch-radio', async (req, res) => {
         await twilioClient.calls.create({
             twiml: twiml.toString(),
             to: driver.phone,
-            from:"+18558121783" 
+            from:"+18558121783" // ✅ Hardcoded Phone to fix Auth Error
         });
 
         res.json({ success: true, message: "Dispatch sent" });
     } catch (error) {
         console.error("Dispatch Error:", error);
-        res.status(500).json({ error: "Radio Dispatch Failed" });
+        // ✅ UPDATED: Send exact error to frontend
+        res.status(500).json({ error: error.message || "Radio Dispatch Failed" });
     }
 });
 
