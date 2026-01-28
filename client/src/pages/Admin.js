@@ -56,11 +56,25 @@ const Admin = () => {
     }
   };
 
-  // ✅ HELPER: Lookup Driver Name from ID
-  const getDriverName = (driverId) => {
-      if (!driverId) return 'Unclaimed';
-      const driver = users.find(u => u._id === driverId);
-      return driver ? `Assigned: ${driver.name}` : 'Unknown ID';
+  // ✅ NEW: Assign Driver Function
+  const assignDriver = async (bookingId, driverId) => {
+    // Optimistic Update (Update UI immediately)
+    const updatedBookings = bookings.map(b => 
+        b.id === bookingId || b._id === bookingId ? { ...b, driverId: driverId } : b
+    );
+    setBookings(updatedBookings);
+
+    try {
+        const res = await fetch(`${apiUrl}/api/admin/assign-driver`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': password },
+            body: JSON.stringify({ bookingId, driverId })
+        });
+        if (!res.ok) throw new Error("Failed to assign");
+    } catch (err) {
+        alert("Error assigning driver. Please try again.");
+        fetchData(); // Revert on failure
+    }
   };
 
   const getChartData = () => {
@@ -77,7 +91,6 @@ const Admin = () => {
     });
   };
 
-  // ✅ KPI Logic: Fixed to read 'totalCharged' if 'amount' is missing
   const totalRevenue = bookings ? bookings.reduce((sum, b) => sum + (Number(b.amount || b.totalCharged) / 100), 0) : 0;
   
   const filteredBookings = bookings ? bookings.filter(job => 
@@ -99,7 +112,7 @@ const Admin = () => {
   }
 
   return (
-    <div style={{padding: '20px', minHeight: '100vh', background: '#f8f9fa', maxWidth: '1200px', margin: '0 auto'}}>
+    <div style={{padding: '20px', minHeight: '100vh', background: '#f8f9fa', color: '#333', maxWidth: '1200px', margin: '0 auto'}}>
       <div style={headerNav}>
         <h1 style={{fontSize: '1.8rem'}}>Fleet Control</h1>
         <button onClick={() => setBookings(null)} style={logoutBtn}>Log Out</button>
@@ -131,19 +144,29 @@ const Admin = () => {
           
           <div style={tableWrapper}>
             <table style={mainTable}>
-              <thead><tr style={tableHeader}><th>Date/Client</th><th>Route</th><th>Driver</th><th>Fare</th><th>Action</th></tr></thead>
+              <thead><tr style={tableHeader}><th>Date/Client</th><th>Route</th><th>Dispatcher</th><th>Fare</th><th>Action</th></tr></thead>
               <tbody>
                 {filteredBookings.map((job) => (
                   <tr key={job.id} style={tableRow}>
                     <td style={tdStyle}><div><strong>{job.date}</strong></div><div style={{color: '#666', fontSize:'0.8rem'}}>{job.name}</div></td>
                     <td style={tdStyle}>{job.pickup}</td>
+                    
+                    {/* ✅ FIXED: Dispatch Dropdown */}
                     <td style={tdStyle}>
-                       {/* ✅ FIXED: Shows Name instead of ID */}
-                       <span style={statusBadge(job.driverId)}>{getDriverName(job.driverId)}</span>
+                       <select 
+                         value={job.driverId || ""} 
+                         onChange={(e) => assignDriver(job.id || job._id, e.target.value)}
+                         style={selectStyle}
+                       >
+                         <option value="">-- Unclaimed --</option>
+                         {users.filter(u => u.role === 'driver' && u.isApproved).map(d => (
+                           <option key={d._id} value={d._id}>{d.name}</option>
+                         ))}
+                       </select>
                     </td>
+
                     <td style={tdStyle}><strong>${(job.amount / 100).toFixed(2)}</strong></td>
                     <td style={tdStyle}>
-                        {/* ✅ FIXED: Uses job._id (or mapped id) for delete */}
                         <button onClick={() => deleteBooking(job.id)} style={redBtnStyle}>Remove</button>
                     </td>
                   </tr>
@@ -190,12 +213,13 @@ const mainTable = { width: '100%', borderCollapse: 'collapse', minWidth: '700px'
 const tableHeader = { background: '#f8f8f8', textAlign: 'left', borderBottom: '2px solid #eee' };
 const tableRow = { borderBottom: '1px solid #eee' };
 const thStyle = { padding: '15px', color: '#666', fontSize: '0.85rem' };
-const tdStyle = { padding: '15px', fontSize: '0.9rem' };
+const tdStyle = { padding: '15px', fontSize: '0.9rem', color: '#000' }; // Black text forced
 const activeTabStyle = { background: '#000', color: '#fff', padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer' };
 const inactiveTabStyle = { background: '#fff', color: '#666', padding: '10px 20px', border: '1px solid #eee', borderRadius: '6px', cursor: 'pointer' };
 const redBtnStyle = { background: 'transparent', color: 'red', border: '1px solid red', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' };
 const approveBtnStyle = { background: '#C5A059', border: 'none', padding: '5px 10px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' };
-const statusBadge = (active) => ({ background: active ? '#e6f4ea' : '#fff0f0', color: active ? 'green' : 'red', padding: '5px 10px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' });
 const driverBadge = (approved) => ({ background: approved ? '#e6f4ea' : '#fff4e5', color: approved ? 'green' : 'orange', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' });
+// ✅ NEW Style for the Dropdown
+const selectStyle = { padding: '8px', borderRadius: '4px', border: '1px solid #ddd', background: '#fff', color: '#333', fontSize: '0.9rem', width: '100%' };
 
 export default Admin;

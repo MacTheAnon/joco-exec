@@ -13,7 +13,7 @@ const jwt = require('jsonwebtoken');
 const twilio = require('twilio'); 
 require('dotenv').config();
 
-// Fix for BigInt serialization (Square API)
+// --- CRITICAL FIX: Square BigInt Error ---
 BigInt.prototype.toJSON = function() { return Number(this); };
 
 const PORT = process.env.PORT || 8080;
@@ -139,6 +139,7 @@ app.get('/api/maps/token', (req, res) => {
     res.json({ token: MAPS_TOKENS[domain] || MAPS_TOKENS["default"] });
 });
 
+// ✅ RESTORED: Missing Check Availability Route
 app.post('/api/check-availability', async (req, res) => {
     try {
         const { date, time } = req.body;
@@ -207,12 +208,13 @@ app.post('/api/process-payment', async (req, res) => {
             squarePaymentId: paymentId, ...bookingDetails, totalCharged: amountInCents, status: 'PAID'
         });
 
+        // Notify ALL drivers of a NEW unassigned job
         try {
             const drivers = await User.find({ role: 'driver', isApproved: true });
             drivers.forEach(d => {
                 transporter.sendMail({
                     from: `"JOCO EXEC" <${process.env.EMAIL_USER}>`, to: d.email,
-                    subject: `NEW JOB`, html: `<p>New Job Available: $${(amountInCents/100).toFixed(2)}</p>`
+                    subject: `NEW JOB Available`, html: `<p>New Job Available: $${(amountInCents/100).toFixed(2)}</p>`
                 }).catch(() => {});
             });
         } catch (e) {}
@@ -264,6 +266,37 @@ app.post('/api/admin/approve-driver', async (req, res) => {
     res.json({ success: true });
 });
 
+// ✅ NEW: Dispatch Driver Route
+app.post('/api/admin/assign-driver', async (req, res) => {
+    try {
+        const { bookingId, driverId } = req.body;
+        
+        // 1. Update the booking in DB
+        const booking = await Booking.findByIdAndUpdate(bookingId, { 
+            driverId: driverId, 
+            status: driverId ? 'ASSIGNED' : 'PAID' // If driverId is empty, revert to PAID
+        }, { new: true });
+
+        // 2. Notify the Specific Driver
+        if (driverId) {
+            const driver = await User.findById(driverId);
+            if (driver && driver.email) {
+                 transporter.sendMail({
+                    from: `"JOCO DISPATCH" <${process.env.EMAIL_USER}>`,
+                    to: driver.email,
+                    subject: `TRIP ASSIGNED: ${booking.date}`,
+                    html: `<p>You have been assigned a trip.</p><p><strong>Pickup:</strong> ${booking.pickup}</p><p><strong>Time:</strong> ${booking.time}</p>`
+                }).catch(e => console.error("Email fail:", e));
+            }
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Assignment failed" });
+    }
+});
+
 app.delete('/api/admin/bookings/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -286,8 +319,7 @@ app.use(express.static(clientPath));
 
 app.use('/api', (req, res) => res.status(404).json({ error: "API route not found" }));
 
-// ✅ FIXED: Use Regex Match for Catch-All to prevent 'PathError'
-// This avoids the 'Missing parameter name at index' crash with path-to-regexp v6+
+// ✅ FIXED: Use Regex Match for Catch-All
 app.get(/.*/, (req, res) => res.sendFile(path.join(clientPath, 'index.html')));
 
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server Running on Port ${PORT}`));
