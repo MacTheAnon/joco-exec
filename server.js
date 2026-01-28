@@ -13,7 +13,7 @@ const jwt = require('jsonwebtoken');
 const twilio = require('twilio'); 
 require('dotenv').config();
 
-// --- CRITICAL FIX: Square BigInt Error ---
+// Fix for BigInt serialization (Square API)
 BigInt.prototype.toJSON = function() { return Number(this); };
 
 const PORT = process.env.PORT || 8080;
@@ -139,7 +139,6 @@ app.get('/api/maps/token', (req, res) => {
     res.json({ token: MAPS_TOKENS[domain] || MAPS_TOKENS["default"] });
 });
 
-// ✅ RESTORED: Missing Check Availability Route
 app.post('/api/check-availability', async (req, res) => {
     try {
         const { date, time } = req.body;
@@ -222,7 +221,7 @@ app.post('/api/process-payment', async (req, res) => {
     } catch (e) { res.status(500).json({ error: "Payment Failed" }); }
 });
 
-// ✅ ADDED: Missing Driver Dashboard Route
+// ✅ DRIVER & USER ROUTES
 app.get('/api/user/my-bookings', authenticateToken, async (req, res) => {
     try {
         let query = {};
@@ -233,7 +232,6 @@ app.get('/api/user/my-bookings', authenticateToken, async (req, res) => {
         }
         
         const bookings = await Booking.find(query).sort({ bookedAt: -1 });
-        // FIX: Map 'totalCharged' to 'amount'
         const safeBookings = bookings.map(b => ({
             ...b.toObject(),
             amount: b.totalCharged,
@@ -255,7 +253,6 @@ app.post('/api/driver/update-location', async (req, res) => {
 // --- ADMIN ROUTES ---
 app.get('/api/admin/bookings', async (req, res) => {
     const bookings = await Booking.find().sort({ bookedAt: -1 });
-    // FIX: Map 'totalCharged' to 'amount' for Admin too
     const safeBookings = bookings.map(b => ({ ...b.toObject(), amount: b.totalCharged, id: b._id }));
     res.json(safeBookings);
 });
@@ -267,7 +264,6 @@ app.post('/api/admin/approve-driver', async (req, res) => {
     res.json({ success: true });
 });
 
-// ✅ FIXED: Delete Route Logic
 app.delete('/api/admin/bookings/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -282,9 +278,16 @@ app.delete('/api/admin/bookings/:id', async (req, res) => {
     }
 });
 
+// ==========================================
 // 5. PRODUCTION SERVING
+// ==========================================
 const clientPath = path.join(__dirname, 'client', 'build');
 app.use(express.static(clientPath));
-app.get('*', (req, res) => res.sendFile(path.join(clientPath, 'index.html')));
+
+app.use('/api', (req, res) => res.status(404).json({ error: "API route not found" }));
+
+// ✅ FIXED: Use Regex Match for Catch-All to prevent 'PathError'
+// This avoids the 'Missing parameter name at index' crash with path-to-regexp v6+
+app.get(/.*/, (req, res) => res.sendFile(path.join(clientPath, 'index.html')));
 
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server Running on Port ${PORT}`));
