@@ -10,9 +10,10 @@ const Register = () => {
     name: '', 
     username: '', 
     email: '', 
+    phone: '', // ✅ Added Phone to state
     password: '', 
-    companyName: '', // For Corporate Accounts
-    role: 'customer' // Default role
+    companyName: '', 
+    role: 'customer' 
   });
   
   const [isCorporate, setIsCorporate] = useState(false);
@@ -24,27 +25,25 @@ const Register = () => {
 
   // --- HANDLERS ---
 
-  // Handle Text Inputs
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     if (error) setError('');
   };
 
-  // Handle Role Toggles (Corporate vs Driver)
   const handleRoleChange = (type) => {
     if (type === 'corporate') {
         const newState = !isCorporate;
         setIsCorporate(newState);
-        setIsDriver(false); // Can't be both
+        setIsDriver(false);
         setFormData({ 
             ...formData, 
             role: newState ? 'corporate' : 'customer',
-            companyName: newState ? formData.companyName : '' // Clear company if unchecked
+            companyName: newState ? formData.companyName : ''
         });
     } else if (type === 'driver') {
         const newState = !isDriver;
         setIsDriver(newState);
-        setIsCorporate(false); // Can't be both
+        setIsCorporate(false);
         setFormData({ 
             ...formData, 
             role: newState ? 'driver' : 'customer',
@@ -53,14 +52,12 @@ const Register = () => {
     }
   };
 
-  // Submit Form to Server
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     try {
-      // ✅ UPDATED TO USE API_BASE VARIABLE
       const res = await fetch(`${API_BASE}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -149,6 +146,19 @@ const Register = () => {
                 type="email" 
                 name="email" 
                 placeholder="name@example.com" 
+                onChange={handleChange} 
+                required 
+                style={inputStyle} 
+              />
+            </div>
+
+            {/* ✅ ADDED: Phone Number Input */}
+            <div style={inputGroupStyle}>
+              <label style={labelStyle}>Phone Number</label>
+              <input 
+                type="tel" 
+                name="phone" 
+                placeholder="+1 (913) 555-0199" 
                 onChange={handleChange} 
                 required 
                 style={inputStyle} 

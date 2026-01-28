@@ -97,7 +97,7 @@ const Admin = () => {
       }
   };
 
-  // ✅ NEW: Update Phone Function
+  // ✅ NEW: Update Phone Function (Click the Pencil to use)
   const updatePhone = async (userId, currentPhone) => {
       const newPhone = window.prompt("Enter Driver Phone Number (+1...):", currentPhone || "");
       if (newPhone && newPhone !== currentPhone) {
@@ -109,7 +109,7 @@ const Admin = () => {
               });
               if (res.ok) {
                   alert("Phone Updated!");
-                  fetchData(); // Refresh list
+                  fetchData(); // Refresh list to show new number
               }
           } catch(e) {
               alert("Update Failed");
@@ -235,7 +235,7 @@ const Admin = () => {
       ) : (
         <div style={tableWrapper}>
           <table style={mainTable}>
-            {/* ✅ ADDED: 'Phone' column to header */}
+            {/* ✅ ADDED: Phone Column Header */}
             <thead><tr style={tableHeader}><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th>Radio</th><th>Action</th></tr></thead>
             <tbody>
               {users.filter(u => u.role === 'driver').map(d => (
@@ -243,12 +243,13 @@ const Admin = () => {
                   <td style={tdStyle}>{d.name}</td>
                   <td style={tdStyle}>{d.email}</td>
                   
-                  {/* ✅ ADDED: Phone Column with Edit Button */}
+                  {/* ✅ ADDED: Phone Column + Edit Button */}
                   <td style={tdStyle}>
                       {d.phone || <span style={{color: '#999', fontStyle: 'italic', fontSize: '0.8rem'}}>No Phone</span>}
                       <button 
                         onClick={() => updatePhone(d._id, d.phone)} 
-                        style={{marginLeft: '10px', cursor: 'pointer', border: 'none', background: 'none'}}
+                        title="Edit Phone Number"
+                        style={{marginLeft: '10px', cursor: 'pointer', border: 'none', background: 'none', fontSize: '1rem'}}
                       >
                         ✏️
                       </button>

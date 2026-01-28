@@ -32,7 +32,7 @@ const UserSchema = new mongoose.Schema({
     username: { type: String, unique: true, sparse: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    phone: String,
+    phone: String, // ✅ Phone is now stored here
     role: { type: String, enum: ['customer', 'driver', 'admin'], default: 'customer' },
     isApproved: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }
@@ -114,7 +114,6 @@ function calculatePrice(vehicleType, distanceMiles, serviceType, duration, isRou
     return { quote: parseFloat(finalQuote.toFixed(2)), distance: miles.toFixed(2) };
 }
 
-// ✅ MIDDLEWARE: Authenticates Drivers & Customers
 const authenticateToken = (req, res, next) => {
     const token = req.headers['authorization'];
     if (!token) return res.sendStatus(401);
@@ -159,11 +158,12 @@ app.post('/api/get-quote', (req, res) => {
 // --- AUTH ROUTES ---
 app.post('/api/auth/register', async (req, res) => {
     try {
-        const { name, username, email, password, role } = req.body;
+        const { name, username, email, password, role, phone } = req.body; // ✅ Added Phone
         if (await User.findOne({ $or: [{ email }, { username }] })) return res.status(400).json({ error: "User exists." });
         
         const newUser = await User.create({
-            name, username, email, password: await bcrypt.hash(password, 10),
+            name, username, email, phone, // ✅ Save Phone
+            password: await bcrypt.hash(password, 10),
             role: role || 'customer', isApproved: role !== 'driver'
         });
 
@@ -265,7 +265,7 @@ app.post('/api/admin/approve-driver', async (req, res) => {
     res.json({ success: true });
 });
 
-// ✅ NEW: Update Driver Phone Route
+// ✅ NEW: Update Driver Phone Manually
 app.post('/api/admin/update-phone', async (req, res) => {
     try {
         const { userId, phone } = req.body;
