@@ -384,9 +384,29 @@ app.post('/api/admin/approve-driver', async (req, res) => {
     res.json({ success: true });
 });
 
-app.delete('/api/admin/bookings/:id', async (req, res) => {
-    await Booking.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
+app.delete('/api/bookings/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // 1. Safety Check: Is the ID valid?
+        if (!id || id === 'undefined') {
+            return res.status(400).json({ error: "Invalid ID provided" });
+        }
+
+        // 2. Proceed with delete
+        const deletedBooking = await Booking.findByIdAndDelete(id);
+
+        if (!deletedBooking) {
+            return res.status(404).json({ error: "Booking not found" });
+        }
+
+        res.json({ message: "Booking deleted successfully" });
+
+    } catch (error) {
+        console.error("Delete Error:", error);
+        // Don't crash the server, just send an error
+        res.status(500).json({ error: "Server error" });
+    }
 });
 
 // ==========================================

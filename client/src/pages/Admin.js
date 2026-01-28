@@ -51,8 +51,8 @@ const Admin = () => {
         headers: { 'Authorization': password }
       });
       if (res.ok) {
-        setBookings(bookings.filter(b => b.id !== id));
-      }
+       setBookings(bookings.filter(b => b._id !== id));
+      } 
     }
   };
 
@@ -190,10 +190,9 @@ const Admin = () => {
               </thead>
               <tbody>
                 {filteredBookings.map((job) => (
-                  <tr key={job.id} style={tableRow}>
+                  <tr key={job._id} style={tableRow}>
                     <td style={tdStyle}>
-                      <div style={{fontWeight: 'bold'}}>{job.name}</div>
-                      <div style={{fontSize: '0.8rem', color: '#888'}}>{job.date}</div>
+              <button onClick={() => deleteBooking(job._id)} style={redBtnStyle}>Remove</button>
                     </td>
                     <td style={tdStyle}>
                       <div style={{fontSize: '0.85rem', maxWidth: '250px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
