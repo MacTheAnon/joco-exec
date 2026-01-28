@@ -75,7 +75,6 @@ const Admin = () => {
     }
   };
 
-  // ✅ NEW: Dispatch Radio Function
   const dispatchRadio = async (driverId, driverName) => {
       const message = window.prompt(`🎙️ RADIO DISPATCH to ${driverName}:\nEnter brief instruction (e.g. 'Go to Gate 5'):`);
       if (!message) return;
@@ -179,13 +178,13 @@ const Admin = () => {
                     <td style={tdStyle}><div><strong>{job.date}</strong></div><div style={{color: '#666', fontSize:'0.8rem'}}>{job.name}</div></td>
                     <td style={tdStyle}>{job.pickup}</td>
                     
-                    {/* Dispatch Dropdown + Radio Button */}
                     <td style={tdStyle}>
                        <div style={{display: 'flex', gap: '5px'}}>
                            <select 
                              value={job.driverId || ""} 
                              onChange={(e) => assignDriver(job.id || job._id, e.target.value)}
-                             style={selectStyle}
+                             // ✅ FIXED: Dropdown now changes color (Red for Unclaimed, Green for Assigned)
+                             style={getSelectStyle(job.driverId)}
                            >
                              <option value="">-- Unclaimed --</option>
                              {users.filter(u => u.role === 'driver' && u.isApproved).map(d => (
@@ -193,7 +192,6 @@ const Admin = () => {
                              ))}
                            </select>
                            
-                           {/* ✅ RADIO BUTTON: Only shows if driver is assigned */}
                            {job.driverId && (
                                <button 
                                  onClick={() => dispatchRadio(job.driverId, getDriverName(job.driverId))} 
@@ -226,7 +224,6 @@ const Admin = () => {
                   <td style={tdStyle}>{d.name}</td><td style={tdStyle}>{d.email}</td>
                   <td style={tdStyle}><span style={driverBadge(d.isApproved)}>{d.isApproved ? 'ACTIVE' : 'PENDING'}</span></td>
                   
-                  {/* ✅ RADIO COLUMN in Driver Tab too */}
                   <td style={tdStyle}>
                       <button 
                          onClick={() => dispatchRadio(d._id, d.name)} 
@@ -270,8 +267,19 @@ const activeTabStyle = { background: '#000', color: '#fff', padding: '10px 20px'
 const inactiveTabStyle = { background: '#fff', color: '#666', padding: '10px 20px', border: '1px solid #eee', borderRadius: '6px', cursor: 'pointer' };
 const redBtnStyle = { background: 'transparent', color: 'red', border: '1px solid red', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' };
 const approveBtnStyle = { background: '#C5A059', border: 'none', padding: '5px 10px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' };
-const statusBadge = (active) => ({ background: active ? '#e6f4ea' : '#fff0f0', color: active ? 'green' : 'red', padding: '5px 10px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' });
 const driverBadge = (approved) => ({ background: approved ? '#e6f4ea' : '#fff4e5', color: approved ? 'green' : 'orange', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' });
-const selectStyle = { padding: '8px', borderRadius: '4px', border: '1px solid #ddd', background: '#fff', color: '#333', fontSize: '0.9rem', width: '100%' };
+
+// ✅ NEW DYNAMIC STYLE: Changes color based on status
+const getSelectStyle = (assigned) => ({
+  padding: '8px',
+  borderRadius: '4px',
+  border: assigned ? '1px solid #1e7e34' : '1px solid #cf1322',
+  background: assigned ? '#e6f4ea' : '#fff0f0', // Green if assigned, Red/White if Unclaimed
+  color: assigned ? '#1e7e34' : '#cf1322',
+  fontSize: '0.9rem',
+  width: '100%',
+  fontWeight: 'bold',
+  cursor: 'pointer'
+});
 
 export default Admin;
