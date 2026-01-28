@@ -91,7 +91,10 @@ const transporter = nodemailer.createTransport({
     tls: { rejectUnauthorized: false }
 });
 
-const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_TOKEN);
+const twilioClient = twilio(
+  "AC7d8f7e1f30d44152be1365d7398d918d", 
+  "a7fd107f66469042a1ad6f3a1cc7c1fe"
+);
 
 // ==========================================
 // 3. UTILITIES & MIDDLEWARE
@@ -317,7 +320,7 @@ app.post('/api/admin/dispatch-radio', async (req, res) => {
         await twilioClient.calls.create({
             twiml: twiml.toString(),
             to: driver.phone,
-            from: process.env.TWILIO_PHONE 
+            from:"+18558121783" 
         });
 
         res.json({ success: true, message: "Dispatch sent" });
