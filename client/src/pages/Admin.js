@@ -97,7 +97,26 @@ const Admin = () => {
       }
   };
 
-  // HELPER: Lookup Driver Name from ID
+  // ✅ NEW: Update Phone Function
+  const updatePhone = async (userId, currentPhone) => {
+      const newPhone = window.prompt("Enter Driver Phone Number (+1...):", currentPhone || "");
+      if (newPhone && newPhone !== currentPhone) {
+          try {
+              const res = await fetch(`${apiUrl}/api/admin/update-phone`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'Authorization': password },
+                  body: JSON.stringify({ userId, phone: newPhone })
+              });
+              if (res.ok) {
+                  alert("Phone Updated!");
+                  fetchData(); // Refresh list
+              }
+          } catch(e) {
+              alert("Update Failed");
+          }
+      }
+  };
+
   const getDriverName = (driverId) => {
       if (!driverId) return 'Unclaimed';
       const driver = users.find(u => u._id === driverId);
@@ -183,7 +202,6 @@ const Admin = () => {
                            <select 
                              value={job.driverId || ""} 
                              onChange={(e) => assignDriver(job.id || job._id, e.target.value)}
-                             // ✅ FIXED: Dropdown now changes color (Red for Unclaimed, Green for Assigned)
                              style={getSelectStyle(job.driverId)}
                            >
                              <option value="">-- Unclaimed --</option>
@@ -217,11 +235,25 @@ const Admin = () => {
       ) : (
         <div style={tableWrapper}>
           <table style={mainTable}>
-            <thead><tr style={tableHeader}><th>Name</th><th>Email</th><th>Status</th><th>Radio</th><th>Action</th></tr></thead>
+            {/* ✅ ADDED: 'Phone' column to header */}
+            <thead><tr style={tableHeader}><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th>Radio</th><th>Action</th></tr></thead>
             <tbody>
               {users.filter(u => u.role === 'driver').map(d => (
                 <tr key={d._id} style={tableRow}>
-                  <td style={tdStyle}>{d.name}</td><td style={tdStyle}>{d.email}</td>
+                  <td style={tdStyle}>{d.name}</td>
+                  <td style={tdStyle}>{d.email}</td>
+                  
+                  {/* ✅ ADDED: Phone Column with Edit Button */}
+                  <td style={tdStyle}>
+                      {d.phone || <span style={{color: '#999', fontStyle: 'italic', fontSize: '0.8rem'}}>No Phone</span>}
+                      <button 
+                        onClick={() => updatePhone(d._id, d.phone)} 
+                        style={{marginLeft: '10px', cursor: 'pointer', border: 'none', background: 'none'}}
+                      >
+                        ✏️
+                      </button>
+                  </td>
+
                   <td style={tdStyle}><span style={driverBadge(d.isApproved)}>{d.isApproved ? 'ACTIVE' : 'PENDING'}</span></td>
                   
                   <td style={tdStyle}>
@@ -269,12 +301,11 @@ const redBtnStyle = { background: 'transparent', color: 'red', border: '1px soli
 const approveBtnStyle = { background: '#C5A059', border: 'none', padding: '5px 10px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' };
 const driverBadge = (approved) => ({ background: approved ? '#e6f4ea' : '#fff4e5', color: approved ? 'green' : 'orange', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' });
 
-// ✅ NEW DYNAMIC STYLE: Changes color based on status
 const getSelectStyle = (assigned) => ({
   padding: '8px',
   borderRadius: '4px',
   border: assigned ? '1px solid #1e7e34' : '1px solid #cf1322',
-  background: assigned ? '#e6f4ea' : '#fff0f0', // Green if assigned, Red/White if Unclaimed
+  background: assigned ? '#e6f4ea' : '#fff0f0', 
   color: assigned ? '#1e7e34' : '#cf1322',
   fontSize: '0.9rem',
   width: '100%',

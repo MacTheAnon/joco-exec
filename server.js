@@ -76,7 +76,6 @@ const PRICING_CONFIG = {
 const app = express();
 app.use(cors());
 app.use(express.json());
-// Parse URL-encoded bodies (for TwiML callbacks)
 app.use(express.urlencoded({ extended: true }));
 
 const squareClient = new SquareClient({
@@ -266,6 +265,17 @@ app.post('/api/admin/approve-driver', async (req, res) => {
     res.json({ success: true });
 });
 
+// ✅ NEW: Update Driver Phone Route
+app.post('/api/admin/update-phone', async (req, res) => {
+    try {
+        const { userId, phone } = req.body;
+        await User.findByIdAndUpdate(userId, { phone });
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: "Update failed" });
+    }
+});
+
 app.post('/api/admin/assign-driver', async (req, res) => {
     try {
         const { bookingId, driverId } = req.body;
@@ -291,7 +301,6 @@ app.post('/api/admin/assign-driver', async (req, res) => {
     }
 });
 
-// ✅ NEW: WALKIE TALKIE DISPATCH ROUTE
 app.post('/api/admin/dispatch-radio', async (req, res) => {
     try {
         const { driverId, message } = req.body;
@@ -300,20 +309,18 @@ app.post('/api/admin/dispatch-radio', async (req, res) => {
         const driver = await User.findById(driverId);
         if (!driver || !driver.phone) return res.status(400).json({ error: "Driver has no phone number" });
 
-        // TwiML: Tells Twilio what to say when the driver picks up
         const twiml = new twilio.twiml.VoiceResponse();
         twiml.say({ voice: 'alice' }, `Dispatch Message: ${message}`);
         twiml.pause({ length: 1 });
         twiml.say({ voice: 'alice' }, "Repeating: " + message);
 
-        // Make the Call
         await twilioClient.calls.create({
             twiml: twiml.toString(),
             to: driver.phone,
-            from: process.env.TWILIO_PHONE // Ensure this env var is set
+            from: process.env.TWILIO_PHONE 
         });
 
-        res.json({ success: true, message: "Dispatch sent to " + driver.name });
+        res.json({ success: true, message: "Dispatch sent" });
     } catch (error) {
         console.error("Dispatch Error:", error);
         res.status(500).json({ error: "Radio Dispatch Failed" });
