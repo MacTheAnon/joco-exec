@@ -1,20 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { API_URL } from '../apiConfig'; // ✅ New Config Import
 
-// --- API CONFIGURATION ---
-const API_BASE = process.env.REACT_APP_API_URL || 'https://www.jocoexec.com';
-
-const DriverDashboard = () => {
+const DriverDashboard = ({ user }) => { // ✅ Accepts user from App.js
   const [myJobs, setMyJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const user = JSON.parse(localStorage.getItem('user'));
+  
+  // Note: We removed the dangerous "const user = JSON.parse..." line
 
   useEffect(() => {
     const fetchJobs = async () => {
       try {
         const token = localStorage.getItem('token');
-        // Points to production domain via API_BASE
-        const res = await fetch(`${API_BASE}/api/user/my-bookings`, {
+        const res = await fetch(`${API_URL}/api/user/my-bookings`, {
           headers: { 'Authorization': token }
         });
         
@@ -83,7 +81,6 @@ const DriverDashboard = () => {
                   <p style={{ margin: 0 }}>🏁 {job.dropoff}</p>
                 </div>
 
-                {/* LIVE FLIGHT TRACKING BUTTON */}
                 {job.flightNumber && (
                   <div style={{ marginBottom: '15px' }}>
                     <p style={{ margin: '5px 0', color: '#888', fontSize: '0.85rem' }}>
@@ -94,16 +91,9 @@ const DriverDashboard = () => {
                       target="_blank" 
                       rel="noreferrer"
                       style={{
-                        display: 'block', 
-                        background: '#333', 
-                        color: '#fff', 
-                        textAlign: 'center', 
-                        padding: '10px', 
-                        borderRadius: '4px', 
-                        textDecoration: 'none', 
-                        fontSize: '0.9rem',
-                        marginTop: '5px',
-                        border: '1px solid #555'
+                        display: 'block', background: '#333', color: '#fff', textAlign: 'center', 
+                        padding: '10px', borderRadius: '4px', textDecoration: 'none', 
+                        fontSize: '0.9rem', marginTop: '5px', border: '1px solid #555'
                       }}
                     >
                       📡 CHECK LIVE STATUS
@@ -111,7 +101,6 @@ const DriverDashboard = () => {
                   </div>
                 )}
 
-                {/* APPLE MAPS NAVIGATION */}
                 <a 
                   href={`https://maps.apple.com/?daddr=${encodeURIComponent(job.pickup)}&dirflg=d`}
                   target="_blank" 

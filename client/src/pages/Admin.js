@@ -192,7 +192,8 @@ const Admin = () => {
                 {filteredBookings.map((job) => (
                   <tr key={job._id} style={tableRow}>
                     <td style={tdStyle}>
-              <button onClick={() => deleteBooking(job._id)} style={redBtnStyle}>Remove</button>
+                      <div><strong>{job.date}</strong></div>
+                      <div style={{color: '#666', fontSize: '0.8rem'}}>{job.name}</div>
                     </td>
                     <td style={tdStyle}>
                       <div style={{fontSize: '0.85rem', maxWidth: '250px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
@@ -206,7 +207,8 @@ const Admin = () => {
                     </td>
                     <td style={tdStyle}><strong>${(job.amount / 100).toFixed(2)}</strong></td>
                     <td style={tdStyle}>
-                      <button onClick={() => deleteBooking(job.id)} style={redBtnStyle}>Remove</button>
+                      {/* FIX: Using job._id here ensures the delete works */}
+                      <button onClick={() => deleteBooking(job._id)} style={redBtnStyle}>Remove</button>
                     </td>
                   </tr>
                 ))}

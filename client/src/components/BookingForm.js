@@ -1,22 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Map, Marker } from 'mapkit-react';
-
-// --- API CONFIGURATION FOR MOBILE & WEB ---
-const API_BASE = process.env.REACT_APP_API_URL || 'https://www.jocoexec.com';
+import { API_URL } from '../apiConfig'; // ✅ New Config Import
 
 const BookingForm = ({ onSubmit }) => {
-  // --- 1. STATE MANAGEMENT ---
   const [formData, setFormData] = useState({
     name: '', email: '', phone: '', date: '', time: '',
     pickup: '', dropoff: '', pickupCoords: null, dropoffCoords: null,
     meetAndGreet: false, passengers: '1', vehicleType: 'Luxury Sedan',
-    // NEW FIELDS
-    serviceType: 'distance', // 'distance' or 'hourly'
-    stops: [], // Array of { id, address, coords }
-    isRoundTrip: false,
-    returnTime: '',
-    hourlyDuration: 2,
-    flightNumber: '' // <-- NEW FLIGHT TRACKING FIELD
+    serviceType: 'distance', stops: [], isRoundTrip: false,
+    returnTime: '', hourlyDuration: 2, flightNumber: '' 
   });
 
   const [mapToken, setMapToken] = useState(null);
@@ -24,13 +16,10 @@ const BookingForm = ({ onSubmit }) => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [pickupResults, setPickupResults] = useState([]);
   const [dropoffResults, setDropoffResults] = useState([]);
-  // New state for stop results
   const [stopResults, setStopResults] = useState({});
 
-  // --- 2. LIFECYCLE ---
   useEffect(() => {
-    // UPDATED FETCH URL
-    fetch(`${API_BASE}/api/maps/token`)
+    fetch(`${API_URL}/api/maps/token`)
       .then(res => res.json())
       .then(data => {
         if (data.token) setMapToken(data.token);
@@ -42,16 +31,13 @@ const BookingForm = ({ onSubmit }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // --- 3. APPLE MAPS LOGIC ---
   const handleAddressSearch = (query, callback) => {
     if (!window.mapkit || query.length < 3) return;
-    
     const region = new window.mapkit.CoordinateRegion(
       new window.mapkit.Coordinate(38.8814, -94.8191),
       new window.mapkit.CoordinateSpan(0.5, 0.5)
     );
     const search = new window.mapkit.Search({ region });
-    
     search.autocomplete(query, (error, data) => {
       if (!error) callback(data.results);
     });
@@ -66,25 +52,17 @@ const BookingForm = ({ onSubmit }) => {
     setResults([]); 
   };
 
-  // --- NEW: STOP LOGIC ---
   const addStop = () => {
-    setFormData({
-      ...formData,
-      stops: [...formData.stops, { id: Date.now(), address: '', coords: null }]
-    });
+    setFormData({ ...formData, stops: [...formData.stops, { id: Date.now(), address: '', coords: null }] });
   };
 
   const removeStop = (id) => {
-    setFormData({
-      ...formData,
-      stops: formData.stops.filter(s => s.id !== id)
-    });
+    setFormData({ ...formData, stops: formData.stops.filter(s => s.id !== id) });
   };
 
   const handleStopSearch = (id, query) => {
     const newStops = formData.stops.map(s => s.id === id ? { ...s, address: query } : s);
     setFormData({ ...formData, stops: newStops });
-    
     handleAddressSearch(query, (results) => {
       setStopResults(prev => ({ ...prev, [id]: results }));
     });
@@ -103,15 +81,12 @@ const BookingForm = ({ onSubmit }) => {
     setFormData({ ...formData, [e.target.name]: value });
   };
 
-  // --- 4. SUBMISSION & CALCULATION ---
   const handleSubmit = (e) => {
     e.preventDefault();
     setChecking(true);
 
-    // LOGIC BRANCH 1: HOURLY BOOKING (No Map Route Needed)
     if (formData.serviceType === 'hourly') {
-      // UPDATED FETCH URL
-      fetch(`${API_BASE}/api/get-quote`, {
+      fetch(`${API_URL}/api/get-quote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -137,7 +112,6 @@ const BookingForm = ({ onSubmit }) => {
       return;
     }
 
-    // LOGIC BRANCH 2: DISTANCE BOOKING (MapKit Route)
     if (!formData.pickupCoords || !formData.dropoffCoords) {
       alert("Please select addresses from the dropdown list.");
       setChecking(false);
@@ -151,11 +125,7 @@ const BookingForm = ({ onSubmit }) => {
     }
 
     const directions = new window.mapkit.Directions();
-    
-    // Add Stops as Waypoints
-    const waypoints = formData.stops
-      .filter(s => s.coords)
-      .map(s => ({ coordinate: s.coords }));
+    const waypoints = formData.stops.filter(s => s.coords).map(s => ({ coordinate: s.coords }));
 
     directions.route({
       origin: formData.pickupCoords,
@@ -163,15 +133,7 @@ const BookingForm = ({ onSubmit }) => {
       waypoints: waypoints,
       transportType: window.mapkit.Directions.Transport.Automobile
     }, async (error, data) => {
-      
-      if (error) {
-        setChecking(false);
-        console.error("MapKit Route Error:", error);
-        alert("Could not calculate driving route.");
-        return;
-      }
-
-      if (!data || !data.routes || data.routes.length === 0) {
+      if (error || !data || !data.routes || data.routes.length === 0) {
         setChecking(false);
         alert("No route found between these locations.");
         return;
@@ -181,8 +143,7 @@ const BookingForm = ({ onSubmit }) => {
       const distanceMiles = distanceMeters / 1609.34;
 
       try {
-        // UPDATED FETCH URL
-        const quoteRes = await fetch(`${API_BASE}/api/get-quote`, {
+        const quoteRes = await fetch(`${API_URL}/api/get-quote`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -194,7 +155,6 @@ const BookingForm = ({ onSubmit }) => {
         });
         
         if (!quoteRes.ok) throw new Error("Server Calculation Failed");
-        
         const quoteData = await quoteRes.json();
 
         onSubmit({ 
@@ -213,12 +173,10 @@ const BookingForm = ({ onSubmit }) => {
     });
   };
 
-  // --- 5. UI COMPONENTS ---
   return (
     <div style={formCardStyle}>
       <div style={{ textAlign: 'center', marginBottom: '25px' }}>
         <h2 style={headerTitleStyle}>Request a Ride</h2>
-        
         <div style={mapBoxStyle}>
           {mapToken ? (
             <Map token={mapToken}>
@@ -243,7 +201,6 @@ const BookingForm = ({ onSubmit }) => {
            <div style={{ flex: 1 }}><label style={labelStyle}>Phone</label><input type="tel" name="phone" style={inputStyle} onChange={handleChange} required /></div>
         </div>
 
-        {/* --- NEW: Service Type Selector --- */}
         <div style={inputGroupStyle}>
             <label style={labelStyle}>Service Type</label>
             <select name="serviceType" style={inputStyle} onChange={handleChange} value={formData.serviceType}>
@@ -266,31 +223,18 @@ const BookingForm = ({ onSubmit }) => {
           <div style={{ flex: 1 }}><label style={labelStyle}>Time</label><input type="time" name="time" style={inputStyle} onChange={handleChange} required /></div>
         </div>
 
-        {/* PICKUP INPUT */}
         <div style={inputGroupStyle}>
             <label style={labelStyle}>Pickup Location</label>
             <input 
-                type="text" 
-                style={inputStyle} 
-                placeholder="Start typing pickup address..." 
+                type="text" style={inputStyle} placeholder="Start typing pickup address..." 
                 value={formData.pickup}
-                onChange={(e) => { 
-                  setFormData({...formData, pickup: e.target.value}); 
-                  handleAddressSearch(e.target.value, setPickupResults); 
-                }}
+                onChange={(e) => { setFormData({...formData, pickup: e.target.value}); handleAddressSearch(e.target.value, setPickupResults); }}
                 required 
             />
             {pickupResults.length > 0 && (
               <div style={dropdownStyle}>
                 {pickupResults.map(res => (
-                  <div 
-                    key={res.id} 
-                    style={dropdownItemStyle} 
-                    onMouseDown={(e) => {
-                      e.preventDefault(); 
-                      handleSelectAddress(res, 'pickup', setPickupResults);
-                    }}
-                  >
+                  <div key={res.id} style={dropdownItemStyle} onMouseDown={(e) => { e.preventDefault(); handleSelectAddress(res, 'pickup', setPickupResults); }}>
                     {res.displayLines.join(', ')}
                   </div>
                 ))}
@@ -298,43 +242,24 @@ const BookingForm = ({ onSubmit }) => {
             )}
         </div>
 
-        {/* FLIGHT NUMBER INPUT */}
         <div style={inputGroupStyle}>
             <label style={labelStyle}>Flight Number (For Airport Pickups)</label>
-            <input 
-                type="text" 
-                name="flightNumber" 
-                style={inputStyle} 
-                placeholder="e.g. AA1234 or DL505" 
-                value={formData.flightNumber}
-                onChange={handleChange} 
-            />
+            <input type="text" name="flightNumber" style={inputStyle} placeholder="e.g. AA1234 or DL505" value={formData.flightNumber} onChange={handleChange} />
         </div>
 
-        {/* --- CONDITIONAL UI BASED ON SERVICE TYPE --- */}
         {formData.serviceType === 'distance' ? (
             <>
-                {/* STOPS UI */}
                 {formData.stops.map((stop, index) => (
                     <div key={stop.id} style={inputGroupStyle}>
                         <div style={{display: 'flex', justifyContent:'space-between'}}>
                              <label style={labelStyle}>Stop #{index + 1}</label>
                              <span onClick={() => removeStop(stop.id)} style={{color: 'red', cursor: 'pointer', fontSize:'0.8rem'}}>REMOVE</span>
                         </div>
-                        <input 
-                            type="text" 
-                            style={inputStyle} 
-                            placeholder="Add stop address..." 
-                            value={stop.address}
-                            onChange={(e) => handleStopSearch(stop.id, e.target.value)}
-                        />
+                        <input type="text" style={inputStyle} placeholder="Add stop address..." value={stop.address} onChange={(e) => handleStopSearch(stop.id, e.target.value)} />
                         {stopResults[stop.id] && stopResults[stop.id].length > 0 && (
                             <div style={dropdownStyle}>
                                 {stopResults[stop.id].map(res => (
-                                    <div key={res.id} style={dropdownItemStyle} onMouseDown={(e) => {
-                                        e.preventDefault();
-                                        handleSelectStop(stop.id, res);
-                                    }}>
+                                    <div key={res.id} style={dropdownItemStyle} onMouseDown={(e) => { e.preventDefault(); handleSelectStop(stop.id, res); }}>
                                         {res.displayLines.join(', ')}
                                     </div>
                                 ))}
@@ -345,31 +270,18 @@ const BookingForm = ({ onSubmit }) => {
                 
                 <button type="button" onClick={addStop} style={{...activeButtonStyle, background: '#333', color: '#C5A059', marginBottom: '20px'}}>+ Add Stop</button>
 
-                {/* DROPOFF INPUT */}
                 <div style={inputGroupStyle}>
                     <label style={labelStyle}>Dropoff Destination</label>
                     <input 
-                        type="text" 
-                        style={inputStyle} 
-                        placeholder="Start typing dropoff address..." 
+                        type="text" style={inputStyle} placeholder="Start typing dropoff address..." 
                         value={formData.dropoff}
-                        onChange={(e) => { 
-                          setFormData({...formData, dropoff: e.target.value}); 
-                          handleAddressSearch(e.target.value, setDropoffResults); 
-                        }}
+                        onChange={(e) => { setFormData({...formData, dropoff: e.target.value}); handleAddressSearch(e.target.value, setDropoffResults); }}
                         required 
                     />
                     {dropoffResults.length > 0 && (
                       <div style={dropdownStyle}>
                         {dropoffResults.map(res => (
-                          <div 
-                            key={res.id} 
-                            style={dropdownItemStyle} 
-                            onMouseDown={(e) => {
-                              e.preventDefault(); 
-                              handleSelectAddress(res, 'dropoff', setDropoffResults);
-                            }}
-                          >
+                          <div key={res.id} style={dropdownItemStyle} onMouseDown={(e) => { e.preventDefault(); handleSelectAddress(res, 'dropoff', setDropoffResults); }}>
                             {res.displayLines.join(', ')}
                           </div>
                         ))}
@@ -377,7 +289,6 @@ const BookingForm = ({ onSubmit }) => {
                     )}
                 </div>
 
-                {/* ROUND TRIP TOGGLE */}
                 <div style={checkboxContainerStyle}>
                   <label style={checkboxLabelStyle}>
                     <input type="checkbox" name="isRoundTrip" checked={formData.isRoundTrip} onChange={handleChange} style={checkboxStyle} />
@@ -393,15 +304,11 @@ const BookingForm = ({ onSubmit }) => {
                 )}
             </>
         ) : (
-            // HOURLY DURATION SELECTOR
             <div style={inputGroupStyle}>
                 <label style={labelStyle}>Duration (Hours)</label>
                 <select name="hourlyDuration" style={inputStyle} onChange={handleChange} value={formData.hourlyDuration}>
-                    {[2, 3, 4, 5, 6, 7, 8, 10, 12].map(h => (
-                        <option key={h} value={h}>{h} Hours</option>
-                    ))}
+                    {[2, 3, 4, 5, 6, 7, 8, 10, 12].map(h => <option key={h} value={h}>{h} Hours</option>)}
                 </select>
-                <p style={{color: '#999', fontSize: '0.9rem', marginTop: '10px'}}>Driver will be at your disposal for the selected duration.</p>
             </div>
         )}
 
@@ -420,20 +327,7 @@ const BookingForm = ({ onSubmit }) => {
   );
 };
 
-// --- STYLES (Optimized for Mobile) ---
-const formCardStyle = { 
-  background: '#111', 
-  border: '1px solid #C5A059', 
-  padding: '20px', // Reduced padding for mobile
-  borderRadius: '12px', 
-  width: '100%', // Takes full width of parent
-  maxWidth: '550px', // But never wider than 550px
-  margin: '0 auto', 
-  color: '#fff', 
-  boxShadow: '0 20px 50px rgba(0,0,0,0.5)', 
-  boxSizing: 'border-box', // Critical for fitting borders
-  position: 'relative'
-};
+const formCardStyle = { background: '#111', border: '1px solid #C5A059', padding: '20px', borderRadius: '12px', width: '100%', maxWidth: '550px', margin: '0 auto', color: '#fff', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', boxSizing: 'border-box', position: 'relative' };
 const dropdownStyle = { position: 'absolute', zIndex: 9999, background: '#000', border: '1px solid #C5A059', borderRadius: '4px', width: '100%', marginTop: '0', maxHeight: '200px', overflowY: 'auto' };
 const dropdownItemStyle = { padding: '15px', cursor: 'pointer', borderBottom: '1px solid #222', fontSize: '1rem', color: '#fff', background: '#000' };
 const headerTitleStyle = { color: '#C5A059', marginTop: 0, fontSize: '1.8rem', fontFamily: '"Playfair Display", serif', marginBottom: '5px'};

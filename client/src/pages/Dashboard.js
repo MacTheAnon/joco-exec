@@ -1,18 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { API_URL } from '../apiConfig'; // ✅ New Config Import
 
-const Dashboard = () => {
+const Dashboard = ({ user }) => { // ✅ Accepts user from App.js
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
-  const user = JSON.parse(localStorage.getItem('user'));
 
   useEffect(() => {
     const fetchMyTrips = async () => {
       try {
         const token = localStorage.getItem('token');
-        // Dynamic API URL for Mobile/Linux testing
-        const apiUrl = process.env.REACT_APP_API_URL || 'https://www.jocoexec.com';
-        
-        const res = await fetch(`${apiUrl}/api/user/my-bookings`, {
+        const res = await fetch(`${API_URL}/api/user/my-bookings`, {
           headers: { 
             'Authorization': token,
             'Content-Type': 'application/json'
@@ -138,12 +135,7 @@ const Dashboard = () => {
 
               <div style={priceActionStyle}>
                 <div style={fareStyle}>${(trip.amount / 100).toFixed(2)}</div>
-                <button 
-                  onClick={() => handlePrint(trip)}
-                  style={printBtnStyle}
-                >
-                  PRINT RECEIPT
-                </button>
+                <button onClick={() => handlePrint(trip)} style={printBtnStyle}>PRINT RECEIPT</button>
               </div>
             </div>
           ))}
@@ -154,130 +146,21 @@ const Dashboard = () => {
 };
 
 // --- STYLES OBJECTS ---
-
-const containerStyle = {
-  padding: '40px 20px',
-  minHeight: '85vh',
-  background: '#000',
-  color: '#fff',
-  maxWidth: '900px',
-  margin: '0 auto'
-};
-
-const welcomeStyle = {
-  color: '#C5A059',
-  fontSize: '2.2rem',
-  margin: 0,
-  fontWeight: 'bold'
-};
-
-const subTextStyle = {
-  color: '#888',
-  marginTop: '5px',
-  fontSize: '1rem'
-};
-
-const statusStyle = {
-  textAlign: 'center',
-  padding: '100px 0',
-  color: '#666'
-};
-
-const emptyStateStyle = {
-  textAlign: 'center',
-  padding: '60px 30px',
-  border: '1px dashed #333',
-  borderRadius: '12px',
-  background: '#0a0a0a'
-};
-
-const listStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '20px'
-};
-
-const tripCardStyle = {
-  background: '#0f0f0f',
-  border: '1px solid #1a1a1a',
-  borderRadius: '12px',
-  padding: '25px',
-  display: 'flex',
-  flexDirection: window.innerWidth < 768 ? 'column' : 'row',
-  justifyContent: 'space-between',
-  transition: 'transform 0.2s',
-  gap: '20px'
-};
-
+const containerStyle = { padding: '40px 20px', minHeight: '85vh', background: '#000', color: '#fff', maxWidth: '900px', margin: '0 auto' };
+const welcomeStyle = { color: '#C5A059', fontSize: '2.2rem', margin: 0, fontWeight: 'bold' };
+const subTextStyle = { color: '#888', marginTop: '5px', fontSize: '1rem' };
+const statusStyle = { textAlign: 'center', padding: '100px 0', color: '#666' };
+const emptyStateStyle = { textAlign: 'center', padding: '60px 30px', border: '1px dashed #333', borderRadius: '12px', background: '#0a0a0a' };
+const listStyle = { display: 'flex', flexDirection: 'column', gap: '20px' };
+const tripCardStyle = { background: '#0f0f0f', border: '1px solid #1a1a1a', borderRadius: '12px', padding: '25px', display: 'flex', flexDirection: window.innerWidth < 768 ? 'column' : 'row', justifyContent: 'space-between', transition: 'transform 0.2s', gap: '20px' };
 const tripInfoStyle = { flex: 2 };
-
-const badgeStyle = (isPast) => ({
-  fontSize: '0.65rem',
-  padding: '4px 10px',
-  borderRadius: '50px',
-  background: isPast ? '#222' : '#C5A059',
-  color: isPast ? '#888' : '#000',
-  fontWeight: 'bold',
-  letterSpacing: '1px'
-});
-
-const dateStyle = {
-  margin: '10px 0',
-  fontSize: '1.4rem',
-  fontWeight: '600'
-};
-
-const locationBoxStyle = {
-  marginTop: '15px',
-  borderLeft: '2px solid #222',
-  paddingLeft: '15px'
-};
-
-const locTextStyle = {
-  margin: '5px 0',
-  color: '#ccc',
-  fontSize: '0.9rem',
-  lineHeight: '1.5'
-};
-
-const priceActionStyle = {
-  flex: 1,
-  display: 'flex',
-  flexDirection: 'column',
-  justifyContent: 'center',
-  alignItems: window.innerWidth < 768 ? 'flex-start' : 'flex-end',
-  borderTop: window.innerWidth < 768 ? '1px solid #222' : 'none',
-  paddingTop: window.innerWidth < 768 ? '20px' : '0'
-};
-
-const fareStyle = {
-  fontSize: '1.8rem',
-  fontWeight: 'bold',
-  color: '#fff',
-  marginBottom: '10px'
-};
-
-const printBtnStyle = {
-  padding: '10px 20px',
-  background: 'transparent',
-  border: '1px solid #C5A059',
-  color: '#C5A059',
-  borderRadius: '4px',
-  cursor: 'pointer',
-  fontSize: '0.8rem',
-  fontWeight: 'bold',
-  transition: '0.3s',
-  width: window.innerWidth < 768 ? '100%' : 'auto'
-};
-
-const actionButtonStyle = {
-  marginTop: '20px',
-  padding: '15px 30px',
-  background: '#C5A059',
-  border: 'none',
-  borderRadius: '4px',
-  fontWeight: 'bold',
-  cursor: 'pointer'
-};
+const badgeStyle = (isPast) => ({ fontSize: '0.65rem', padding: '4px 10px', borderRadius: '50px', background: isPast ? '#222' : '#C5A059', color: isPast ? '#888' : '#000', fontWeight: 'bold', letterSpacing: '1px' });
+const dateStyle = { margin: '10px 0', fontSize: '1.4rem', fontWeight: '600' };
+const locationBoxStyle = { marginTop: '15px', borderLeft: '2px solid #222', paddingLeft: '15px' };
+const locTextStyle = { margin: '5px 0', color: '#ccc', fontSize: '0.9rem', lineHeight: '1.5' };
+const priceActionStyle = { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: window.innerWidth < 768 ? 'flex-start' : 'flex-end', borderTop: window.innerWidth < 768 ? '1px solid #222' : 'none', paddingTop: window.innerWidth < 768 ? '20px' : '0' };
+const fareStyle = { fontSize: '1.8rem', fontWeight: 'bold', color: '#fff', marginBottom: '10px' };
+const printBtnStyle = { padding: '10px 20px', background: 'transparent', border: '1px solid #C5A059', color: '#C5A059', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold', transition: '0.3s', width: window.innerWidth < 768 ? '100%' : 'auto' };
+const actionButtonStyle = { marginTop: '20px', padding: '15px 30px', background: '#C5A059', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' };
 
 export default Dashboard;

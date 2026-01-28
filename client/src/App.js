@@ -19,18 +19,21 @@ import Footer from './components/Footer';
 function App() {
   const [user, setUser] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  
-  // Track window size for mobile menu behavior (100% Preserved)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
-    // Check for existing session
+    // --- 🔴 CRITICAL FIX: Safety Wrapper ---
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        console.error("Session corrupted, clearing data.");
+        localStorage.removeItem('user'); // Auto-fix the crash
+        setUser(null);
+      }
     }
 
-    // Add Resize Listener (100% Preserved)
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -59,7 +62,6 @@ function App() {
             </div>
           </Link>
 
-          {/* Hamburger Icon */}
           <button 
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             style={{
@@ -70,7 +72,6 @@ function App() {
             {isMenuOpen ? '✕' : '☰'}
           </button>
           
-          {/* Navigation Links - Logic Preserved */}
           <div style={{
             display: (isMenuOpen || !isMobile) ? 'flex' : 'none',
             flexDirection: isMobile ? 'column' : 'row',
@@ -109,10 +110,10 @@ function App() {
             <Route path="/terms" element={<Terms />} />
             <Route path="/refunds" element={<Refunds />} />
 
-            {/* Protected Routes: Redirection Logic Preserved */}
+            {/* 🔴 FIXED: Passing 'user' prop prevents crashes on these pages */}
             <Route path="/admin" element={user && user.role === 'admin' ? <Admin /> : <Navigate to="/login" />} />
-            <Route path="/dashboard" element={user ? <Dashboard /> : <Navigate to="/login" />} />
-            <Route path="/driver-dashboard" element={user && user.role === 'driver' ? <DriverDashboard /> : <Navigate to="/login" />} />
+            <Route path="/dashboard" element={user ? <Dashboard user={user} /> : <Navigate to="/login" />} />
+            <Route path="/driver-dashboard" element={user && user.role === 'driver' ? <DriverDashboard user={user} /> : <Navigate to="/login" />} />
           </Routes>
         </div>
 
@@ -122,7 +123,6 @@ function App() {
   );
 }
 
-// --- STYLES (100% Preserved) ---
 const navLinkStyle = { color: '#fff', textDecoration: 'none', padding: '10px' };
 const goldLinkStyle = { ...navLinkStyle, color: '#C5A059', fontWeight: 'bold' };
 const logoutBtnStyle = { background: 'transparent', color: '#fff', border: '1px solid #444', padding: '5px 12px', cursor: 'pointer', borderRadius: '4px', marginLeft: '10px' };

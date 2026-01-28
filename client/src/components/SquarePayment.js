@@ -1,17 +1,13 @@
 import React, { useState } from 'react';
 import { PaymentForm, CreditCard } from 'react-square-web-payments-sdk';
-
-// --- API CONFIGURATION ---
-const API_BASE = process.env.REACT_APP_API_URL || 'https://www.jocoexec.com';
+import { API_URL } from '../apiConfig'; // ✅ New Config Import
 
 const SquarePayment = ({ onSuccess, bookingDetails }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Visual Display Calculation (Adds $25 for display only)
-  // Preserves the business logic for Airport Meet & Greet
   let displayAmount = bookingDetails.amount;
   if (bookingDetails.meetAndGreet) {
-    displayAmount += 2500; // +$25.00
+    displayAmount += 2500;
   }
 
   return (
@@ -20,35 +16,23 @@ const SquarePayment = ({ onSuccess, bookingDetails }) => {
       
       <div style={{marginBottom: '20px', textAlign: 'center', background: '#f9f9f9', padding: '15px', borderRadius: '6px'}}>
         <p style={{margin: '5px 0', color: '#555'}}>Date: <strong>{bookingDetails.date}</strong></p>
-        
-        <p style={{margin: '5px 0', color: '#555'}}>
-           Service: <strong>{bookingDetails.vehicleType || 'Standard'}</strong>
-        </p>
-
-        {bookingDetails.meetAndGreet && (
-            <p style={{margin: '5px 0', color: '#C5A059', fontWeight: 'bold'}}>+ Airport Meet & Greet Included</p>
-        )}
-        
-        <p style={{fontSize: '1.2rem', marginTop: '10px'}}>
-          Total Deposit: <strong style={{color: '#000'}}>${(displayAmount / 100).toFixed(2)}</strong>
-        </p>
+        <p style={{margin: '5px 0', color: '#555'}}>Service: <strong>{bookingDetails.vehicleType || 'Standard'}</strong></p>
+        {bookingDetails.meetAndGreet && (<p style={{margin: '5px 0', color: '#C5A059', fontWeight: 'bold'}}>+ Airport Meet & Greet Included</p>)}
+        <p style={{fontSize: '1.2rem', marginTop: '10px'}}>Total Deposit: <strong style={{color: '#000'}}>${(displayAmount / 100).toFixed(2)}</strong></p>
       </div>
 
       <PaymentForm
-        // ✅ NOW USES SECURE VARIABLES
         applicationId={process.env.REACT_APP_SQUARE_APP_ID}
         locationId={process.env.REACT_APP_SQUARE_LOCATION_ID}
         
         cardTokenizeResponseReceived={async (token) => {
           setIsSubmitting(true);
           try {
-            // ✅ Updated to use dynamic API_BASE
-            const response = await fetch(`${API_BASE}/api/process-payment`, {
+            const response = await fetch(`${API_URL}/api/process-payment`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 
                 sourceId: token.token,
-                // These details pass the booking info to your server
                 vehicleType: bookingDetails.vehicleType, 
                 pickup: bookingDetails.pickup, 
                 dropoff: bookingDetails.dropoff,
@@ -58,14 +42,14 @@ const SquarePayment = ({ onSuccess, bookingDetails }) => {
 
             if (response.ok) {
               const data = await response.json();
-              onSuccess(data); // Pass server response back to parent
+              onSuccess(data); 
             } else {
               const errorData = await response.json();
               alert(`Payment Error: ${errorData.error || 'Declined'}`);
               setIsSubmitting(false);
             }
           } catch (error) {
-            alert('Network Error. Ensure Server is running on https://www.jocoexec.com');
+            alert('Network Error. Ensure Server is running.');
             setIsSubmitting(false);
           }
         }}
