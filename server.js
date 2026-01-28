@@ -94,7 +94,7 @@ const transporter = nodemailer.createTransport({
 // --- ⚠️ HARDCODED CREDENTIALS (NUCLEAR FIX) ---
 const twilioClient = twilio(
   "AC7d8f7e1f30d44152be1365d7398d918d", 
-  "a7fd107f66469042a1ad6f3a1cc7c1fe"
+  "c7408d72d82a32f25b0d52844cd49f93"
 );
 
 // ==========================================
