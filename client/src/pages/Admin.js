@@ -56,9 +56,7 @@ const Admin = () => {
     }
   };
 
-  // ✅ NEW: Assign Driver Function
   const assignDriver = async (bookingId, driverId) => {
-    // Optimistic Update (Update UI immediately)
     const updatedBookings = bookings.map(b => 
         b.id === bookingId || b._id === bookingId ? { ...b, driverId: driverId } : b
     );
@@ -73,8 +71,38 @@ const Admin = () => {
         if (!res.ok) throw new Error("Failed to assign");
     } catch (err) {
         alert("Error assigning driver. Please try again.");
-        fetchData(); // Revert on failure
+        fetchData(); 
     }
+  };
+
+  // ✅ NEW: Dispatch Radio Function
+  const dispatchRadio = async (driverId, driverName) => {
+      const message = window.prompt(`🎙️ RADIO DISPATCH to ${driverName}:\nEnter brief instruction (e.g. 'Go to Gate 5'):`);
+      if (!message) return;
+
+      try {
+          const res = await fetch(`${apiUrl}/api/admin/dispatch-radio`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': password },
+              body: JSON.stringify({ driverId, message })
+          });
+          
+          if (res.ok) {
+              alert("✅ Radio sent! Driver's phone will ring momentarily.");
+          } else {
+              const data = await res.json();
+              alert("❌ Dispatch Failed: " + (data.error || "Unknown Error"));
+          }
+      } catch (e) {
+          alert("❌ Network Error");
+      }
+  };
+
+  // HELPER: Lookup Driver Name from ID
+  const getDriverName = (driverId) => {
+      if (!driverId) return 'Unclaimed';
+      const driver = users.find(u => u._id === driverId);
+      return driver ? `Assigned: ${driver.name}` : 'Unknown ID';
   };
 
   const getChartData = () => {
@@ -151,18 +179,31 @@ const Admin = () => {
                     <td style={tdStyle}><div><strong>{job.date}</strong></div><div style={{color: '#666', fontSize:'0.8rem'}}>{job.name}</div></td>
                     <td style={tdStyle}>{job.pickup}</td>
                     
-                    {/* ✅ FIXED: Dispatch Dropdown */}
+                    {/* Dispatch Dropdown + Radio Button */}
                     <td style={tdStyle}>
-                       <select 
-                         value={job.driverId || ""} 
-                         onChange={(e) => assignDriver(job.id || job._id, e.target.value)}
-                         style={selectStyle}
-                       >
-                         <option value="">-- Unclaimed --</option>
-                         {users.filter(u => u.role === 'driver' && u.isApproved).map(d => (
-                           <option key={d._id} value={d._id}>{d.name}</option>
-                         ))}
-                       </select>
+                       <div style={{display: 'flex', gap: '5px'}}>
+                           <select 
+                             value={job.driverId || ""} 
+                             onChange={(e) => assignDriver(job.id || job._id, e.target.value)}
+                             style={selectStyle}
+                           >
+                             <option value="">-- Unclaimed --</option>
+                             {users.filter(u => u.role === 'driver' && u.isApproved).map(d => (
+                               <option key={d._id} value={d._id}>{d.name}</option>
+                             ))}
+                           </select>
+                           
+                           {/* ✅ RADIO BUTTON: Only shows if driver is assigned */}
+                           {job.driverId && (
+                               <button 
+                                 onClick={() => dispatchRadio(job.driverId, getDriverName(job.driverId))} 
+                                 title="Radio Blast Driver"
+                                 style={{background: '#333', border:'none', borderRadius: '4px', cursor: 'pointer', padding: '0 8px'}}
+                               >
+                                 🎙️
+                               </button>
+                           )}
+                       </div>
                     </td>
 
                     <td style={tdStyle}><strong>${(job.amount / 100).toFixed(2)}</strong></td>
@@ -178,12 +219,23 @@ const Admin = () => {
       ) : (
         <div style={tableWrapper}>
           <table style={mainTable}>
-            <thead><tr style={tableHeader}><th>Name</th><th>Email</th><th>Status</th><th>Action</th></tr></thead>
+            <thead><tr style={tableHeader}><th>Name</th><th>Email</th><th>Status</th><th>Radio</th><th>Action</th></tr></thead>
             <tbody>
               {users.filter(u => u.role === 'driver').map(d => (
                 <tr key={d._id} style={tableRow}>
                   <td style={tdStyle}>{d.name}</td><td style={tdStyle}>{d.email}</td>
                   <td style={tdStyle}><span style={driverBadge(d.isApproved)}>{d.isApproved ? 'ACTIVE' : 'PENDING'}</span></td>
+                  
+                  {/* ✅ RADIO COLUMN in Driver Tab too */}
+                  <td style={tdStyle}>
+                      <button 
+                         onClick={() => dispatchRadio(d._id, d.name)} 
+                         style={{background: '#333', color: '#fff', border:'none', borderRadius: '4px', cursor: 'pointer', padding: '5px 10px'}}
+                       >
+                         🎙️ CALL
+                       </button>
+                  </td>
+
                   <td style={tdStyle}>{!d.isApproved && <button onClick={() => approveDriver(d.email)} style={approveBtnStyle}>APPROVE</button>}</td>
                 </tr>
               ))}
@@ -213,13 +265,13 @@ const mainTable = { width: '100%', borderCollapse: 'collapse', minWidth: '700px'
 const tableHeader = { background: '#f8f8f8', textAlign: 'left', borderBottom: '2px solid #eee' };
 const tableRow = { borderBottom: '1px solid #eee' };
 const thStyle = { padding: '15px', color: '#666', fontSize: '0.85rem' };
-const tdStyle = { padding: '15px', fontSize: '0.9rem', color: '#000' }; // Black text forced
+const tdStyle = { padding: '15px', fontSize: '0.9rem', color: '#000' };
 const activeTabStyle = { background: '#000', color: '#fff', padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer' };
 const inactiveTabStyle = { background: '#fff', color: '#666', padding: '10px 20px', border: '1px solid #eee', borderRadius: '6px', cursor: 'pointer' };
 const redBtnStyle = { background: 'transparent', color: 'red', border: '1px solid red', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' };
 const approveBtnStyle = { background: '#C5A059', border: 'none', padding: '5px 10px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' };
+const statusBadge = (active) => ({ background: active ? '#e6f4ea' : '#fff0f0', color: active ? 'green' : 'red', padding: '5px 10px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' });
 const driverBadge = (approved) => ({ background: approved ? '#e6f4ea' : '#fff4e5', color: approved ? 'green' : 'orange', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' });
-// ✅ NEW Style for the Dropdown
 const selectStyle = { padding: '8px', borderRadius: '4px', border: '1px solid #ddd', background: '#fff', color: '#333', fontSize: '0.9rem', width: '100%' };
 
 export default Admin;

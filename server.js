@@ -76,6 +76,8 @@ const PRICING_CONFIG = {
 const app = express();
 app.use(cors());
 app.use(express.json());
+// Parse URL-encoded bodies (for TwiML callbacks)
+app.use(express.urlencoded({ extended: true }));
 
 const squareClient = new SquareClient({
     token: process.env.SQUARE_ACCESS_TOKEN,
@@ -139,7 +141,6 @@ app.get('/api/maps/token', (req, res) => {
     res.json({ token: MAPS_TOKENS[domain] || MAPS_TOKENS["default"] });
 });
 
-// ✅ RESTORED: Missing Check Availability Route
 app.post('/api/check-availability', async (req, res) => {
     try {
         const { date, time } = req.body;
@@ -208,7 +209,6 @@ app.post('/api/process-payment', async (req, res) => {
             squarePaymentId: paymentId, ...bookingDetails, totalCharged: amountInCents, status: 'PAID'
         });
 
-        // Notify ALL drivers of a NEW unassigned job
         try {
             const drivers = await User.find({ role: 'driver', isApproved: true });
             drivers.forEach(d => {
@@ -266,18 +266,14 @@ app.post('/api/admin/approve-driver', async (req, res) => {
     res.json({ success: true });
 });
 
-// ✅ NEW: Dispatch Driver Route
 app.post('/api/admin/assign-driver', async (req, res) => {
     try {
         const { bookingId, driverId } = req.body;
-        
-        // 1. Update the booking in DB
         const booking = await Booking.findByIdAndUpdate(bookingId, { 
             driverId: driverId, 
-            status: driverId ? 'ASSIGNED' : 'PAID' // If driverId is empty, revert to PAID
+            status: driverId ? 'ASSIGNED' : 'PAID' 
         }, { new: true });
 
-        // 2. Notify the Specific Driver
         if (driverId) {
             const driver = await User.findById(driverId);
             if (driver && driver.email) {
@@ -289,11 +285,38 @@ app.post('/api/admin/assign-driver', async (req, res) => {
                 }).catch(e => console.error("Email fail:", e));
             }
         }
-
         res.json({ success: true });
     } catch (error) {
-        console.error(error);
         res.status(500).json({ error: "Assignment failed" });
+    }
+});
+
+// ✅ NEW: WALKIE TALKIE DISPATCH ROUTE
+app.post('/api/admin/dispatch-radio', async (req, res) => {
+    try {
+        const { driverId, message } = req.body;
+        if (!message) return res.status(400).json({ error: "No message provided" });
+
+        const driver = await User.findById(driverId);
+        if (!driver || !driver.phone) return res.status(400).json({ error: "Driver has no phone number" });
+
+        // TwiML: Tells Twilio what to say when the driver picks up
+        const twiml = new twilio.twiml.VoiceResponse();
+        twiml.say({ voice: 'alice' }, `Dispatch Message: ${message}`);
+        twiml.pause({ length: 1 });
+        twiml.say({ voice: 'alice' }, "Repeating: " + message);
+
+        // Make the Call
+        await twilioClient.calls.create({
+            twiml: twiml.toString(),
+            to: driver.phone,
+            from: process.env.TWILIO_PHONE // Ensure this env var is set
+        });
+
+        res.json({ success: true, message: "Dispatch sent to " + driver.name });
+    } catch (error) {
+        console.error("Dispatch Error:", error);
+        res.status(500).json({ error: "Radio Dispatch Failed" });
     }
 });
 
@@ -319,7 +342,7 @@ app.use(express.static(clientPath));
 
 app.use('/api', (req, res) => res.status(404).json({ error: "API route not found" }));
 
-// ✅ FIXED: Use Regex Match for Catch-All
+// Catch-All Regex
 app.get(/.*/, (req, res) => res.sendFile(path.join(clientPath, 'index.html')));
 
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server Running on Port ${PORT}`));
