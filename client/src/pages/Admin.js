@@ -56,6 +56,25 @@ const Admin = () => {
     }
   };
 
+  // ✅ NEW: Delete Driver Function
+  const deleteDriver = async (id) => {
+    if (window.confirm("Are you sure you want to remove this driver? This cannot be undone.")) {
+      try {
+        const res = await fetch(`${apiUrl}/api/admin/users/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': password }
+        });
+        if (res.ok) {
+            setUsers(users.filter(u => u._id !== id));
+        } else {
+            alert("Failed to delete driver");
+        }
+      } catch (e) {
+        alert("Network Error");
+      }
+    }
+  };
+
   const assignDriver = async (bookingId, driverId) => {
     const updatedBookings = bookings.map(b => 
         b.id === bookingId || b._id === bookingId ? { ...b, driverId: driverId } : b
@@ -97,7 +116,6 @@ const Admin = () => {
       }
   };
 
-  // ✅ NEW: Update Phone Function (Click the Pencil to use)
   const updatePhone = async (userId, currentPhone) => {
       const newPhone = window.prompt("Enter Driver Phone Number (+1...):", currentPhone || "");
       if (newPhone && newPhone !== currentPhone) {
@@ -235,7 +253,6 @@ const Admin = () => {
       ) : (
         <div style={tableWrapper}>
           <table style={mainTable}>
-            {/* ✅ ADDED: Phone Column Header */}
             <thead><tr style={tableHeader}><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th>Radio</th><th>Action</th></tr></thead>
             <tbody>
               {users.filter(u => u.role === 'driver').map(d => (
@@ -243,7 +260,6 @@ const Admin = () => {
                   <td style={tdStyle}>{d.name}</td>
                   <td style={tdStyle}>{d.email}</td>
                   
-                  {/* ✅ ADDED: Phone Column + Edit Button */}
                   <td style={tdStyle}>
                       {d.phone || <span style={{color: '#999', fontStyle: 'italic', fontSize: '0.8rem'}}>No Phone</span>}
                       <button 
@@ -266,7 +282,13 @@ const Admin = () => {
                        </button>
                   </td>
 
-                  <td style={tdStyle}>{!d.isApproved && <button onClick={() => approveDriver(d.email)} style={approveBtnStyle}>APPROVE</button>}</td>
+                  {/* ✅ UPDATED: Added Delete Button next to Approve */}
+                  <td style={tdStyle}>
+                    <div style={{display: 'flex', gap: '5px'}}>
+                      {!d.isApproved && <button onClick={() => approveDriver(d.email)} style={approveBtnStyle}>APPROVE</button>}
+                      <button onClick={() => deleteDriver(d._id)} style={redBtnStyle}>REMOVE</button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

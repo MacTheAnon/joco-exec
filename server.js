@@ -32,7 +32,7 @@ const UserSchema = new mongoose.Schema({
     username: { type: String, unique: true, sparse: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    phone: String, // ✅ Phone is now stored here
+    phone: String, 
     role: { type: String, enum: ['customer', 'driver', 'admin'], default: 'customer' },
     isApproved: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }
@@ -92,7 +92,6 @@ const transporter = nodemailer.createTransport({
 });
 
 // --- ⚠️ HARDCODED CREDENTIALS (NUCLEAR FIX) ---
-// This bypasses Railway variables to rule out formatting errors.
 const twilioClient = twilio(
   "AC7d8f7e1f30d44152be1365d7398d918d", 
   "a7fd107f66469042a1ad6f3a1cc7c1fe"
@@ -270,7 +269,6 @@ app.post('/api/admin/approve-driver', async (req, res) => {
     res.json({ success: true });
 });
 
-// ✅ NEW: Update Driver Phone Manually
 app.post('/api/admin/update-phone', async (req, res) => {
     try {
         const { userId, phone } = req.body;
@@ -322,13 +320,12 @@ app.post('/api/admin/dispatch-radio', async (req, res) => {
         await twilioClient.calls.create({
             twiml: twiml.toString(),
             to: driver.phone,
-            from:"+18558121783" // ✅ Hardcoded Phone to fix Auth Error
+            from:"+18558121783" 
         });
 
         res.json({ success: true, message: "Dispatch sent" });
     } catch (error) {
         console.error("Dispatch Error:", error);
-        // ✅ UPDATED: Send exact error to frontend
         res.status(500).json({ error: error.message || "Radio Dispatch Failed" });
     }
 });
@@ -344,6 +341,17 @@ app.delete('/api/admin/bookings/:id', async (req, res) => {
         res.json({ message: "Booking deleted successfully" });
     } catch (error) {
         res.status(500).json({ error: "Server error" });
+    }
+});
+
+// ✅ NEW: Delete User/Driver Route
+app.delete('/api/admin/users/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await User.findByIdAndDelete(id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: "Delete failed" });
     }
 });
 
