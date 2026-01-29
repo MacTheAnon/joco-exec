@@ -91,10 +91,10 @@ const transporter = nodemailer.createTransport({
     tls: { rejectUnauthorized: false }
 });
 
-// --- ⚠️ HARDCODED CREDENTIALS (VERIFIED) ---
+// --- ⚠️ HARDCODED CREDENTIALS (FINAL) ---
 const twilioClient = twilio(
   "AC7d8f7e1f30d44152be1365d7398d918d".trim(), 
-  "c7408d72d82a32f25b0d52844cd49f93".trim() 
+  "7db0ba4dd3585fe93afba506dcf2a9cf".trim() 
 );
 
 // ==========================================
@@ -143,9 +143,9 @@ app.get('/api/maps/token', (req, res) => {
     res.json({ token: MAPS_TOKENS[domain] || MAPS_TOKENS["default"] });
 });
 
-// ✅ MOVED UP: Radio Dispatch Route (Line ~148)
+// ✅ SMS DISPATCH ROUTE (Uses Texting instead of Voice)
 app.post('/api/admin/dispatch-radio', async (req, res) => {
-    console.log("🎙️ DISPATCH REQUEST RECEIVED - New Code Running");
+    console.log("📨 SMS DISPATCH REQUEST RECEIVED");
     try {
         const { driverId, message } = req.body;
         if (!message) return res.status(400).json({ error: "No message provided" });
@@ -153,23 +153,24 @@ app.post('/api/admin/dispatch-radio', async (req, res) => {
         const driver = await User.findById(driverId);
         if (!driver || !driver.phone) return res.status(400).json({ error: "Driver has no phone number" });
 
-        const twiml = new twilio.twiml.VoiceResponse();
-        twiml.say({ voice: 'alice' }, `Dispatch Message: ${message}`);
-        twiml.pause({ length: 1 });
-        twiml.say({ voice: 'alice' }, "Repeating: " + message);
+        // ✅ CLEANER: Ensure phone format is perfect for SMS
+        let cleanPhone = driver.phone.replace(/\D/g, ''); 
+        if (cleanPhone.length === 10) cleanPhone = '1' + cleanPhone; 
+        cleanPhone = '+' + cleanPhone; 
 
-        console.log(`📞 Dialing ${driver.phone}...`);
+        console.log(`📱 Texting Cleaned Number: ${cleanPhone}`);
 
-        await twilioClient.calls.create({
-            twiml: twiml.toString(),
-            to: driver.phone,
-            from: "+18558121783" // ✅ Hardcoded Phone
+        // ✅ Send SMS using Verified Toll-Free Number
+        await twilioClient.messages.create({
+            body: `JOCO DISPATCH: ${message}`, 
+            to: cleanPhone,
+            from: "+18558121783" 
         });
 
-        res.json({ success: true, message: "Dispatch sent" });
+        res.json({ success: true, message: "SMS Dispatch sent" });
     } catch (error) {
-        console.error("❌ Dispatch Error:", error);
-        res.status(500).json({ error: error.message || "Radio Dispatch Failed" });
+        console.error("❌ SMS Error:", error);
+        res.status(500).json({ error: error.message || "SMS Dispatch Failed" });
     }
 });
 
@@ -371,4 +372,4 @@ app.use('/api', (req, res) => res.status(404).json({ error: "API route not found
 app.get(/.*/, (req, res) => res.sendFile(path.join(clientPath, 'index.html')));
 
 // ✅ Startup Log to confirm update
-app.listen(PORT, '0.0.0.0', () => console.log(`✅ SERVER RESTARTED - NEW TWILIO KEYS LOADED on Port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`✅ SERVER RESTARTED - FINAL KEYS LOADED on Port ${PORT}`));
