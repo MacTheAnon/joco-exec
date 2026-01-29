@@ -144,6 +144,36 @@ app.get('/api/maps/token', (req, res) => {
     res.json({ token: MAPS_TOKENS[domain] || MAPS_TOKENS["default"] });
 });
 
+// ✅ MOVED UP: Radio Dispatch Route
+app.post('/api/admin/dispatch-radio', async (req, res) => {
+    console.log("🎙️ DISPATCH REQUEST RECEIVED");
+    try {
+        const { driverId, message } = req.body;
+        if (!message) return res.status(400).json({ error: "No message provided" });
+
+        const driver = await User.findById(driverId);
+        if (!driver || !driver.phone) return res.status(400).json({ error: "Driver has no phone number" });
+
+        const twiml = new twilio.twiml.VoiceResponse();
+        twiml.say({ voice: 'alice' }, `Dispatch Message: ${message}`);
+        twiml.pause({ length: 1 });
+        twiml.say({ voice: 'alice' }, "Repeating: " + message);
+
+        console.log(`📞 Dialing ${driver.phone}...`);
+
+        await twilioClient.calls.create({
+            twiml: twiml.toString(),
+            to: driver.phone,
+            from: "+18558121783" // ✅ Hardcoded Phone
+        });
+
+        res.json({ success: true, message: "Dispatch sent" });
+    } catch (error) {
+        console.error("❌ Dispatch Error:", error);
+        res.status(500).json({ error: error.message || "Radio Dispatch Failed" });
+    }
+});
+
 app.post('/api/check-availability', async (req, res) => {
     try {
         const { date, time } = req.body;
@@ -302,32 +332,6 @@ app.post('/api/admin/assign-driver', async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: "Assignment failed" });
-    }
-});
-
-app.post('/api/admin/dispatch-radio', async (req, res) => {
-    try {
-        const { driverId, message } = req.body;
-        if (!message) return res.status(400).json({ error: "No message provided" });
-
-        const driver = await User.findById(driverId);
-        if (!driver || !driver.phone) return res.status(400).json({ error: "Driver has no phone number" });
-
-        const twiml = new twilio.twiml.VoiceResponse();
-        twiml.say({ voice: 'alice' }, `Dispatch Message: ${message}`);
-        twiml.pause({ length: 1 });
-        twiml.say({ voice: 'alice' }, "Repeating: " + message);
-
-        await twilioClient.calls.create({
-            twiml: twiml.toString(),
-            to: driver.phone,
-            from:"+18558121783" // ✅ Hardcoded Phone
-        });
-
-        res.json({ success: true, message: "Dispatch sent" });
-    } catch (error) {
-        console.error("Dispatch Error:", error);
-        res.status(500).json({ error: error.message || "Radio Dispatch Failed" });
     }
 });
 
