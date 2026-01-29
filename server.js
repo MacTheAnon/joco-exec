@@ -92,9 +92,10 @@ const transporter = nodemailer.createTransport({
 });
 
 // --- ⚠️ HARDCODED CREDENTIALS (NUCLEAR FIX) ---
+// Using the new token you provided: c7408d...
 const twilioClient = twilio(
-  "AC7d8f7e1f30d44152be1365d7398d918d", 
-  "c7408d72d82a32f25b0d52844cd49f93"
+  "AC7d8f7e1f30d44152be1365d7398d918d".trim(), 
+  "c7408d72d82a32f25b0d52844cd49f93".trim() 
 );
 
 // ==========================================
@@ -320,7 +321,7 @@ app.post('/api/admin/dispatch-radio', async (req, res) => {
         await twilioClient.calls.create({
             twiml: twiml.toString(),
             to: driver.phone,
-            from:"+18558121783" 
+            from:"+18558121783" // ✅ Hardcoded Phone
         });
 
         res.json({ success: true, message: "Dispatch sent" });
@@ -344,7 +345,7 @@ app.delete('/api/admin/bookings/:id', async (req, res) => {
     }
 });
 
-// ✅ NEW: Delete User/Driver Route
+// ✅ User Delete Route
 app.delete('/api/admin/users/:id', async (req, res) => {
     try {
         const { id } = req.params;
