@@ -91,10 +91,10 @@ const transporter = nodemailer.createTransport({
     tls: { rejectUnauthorized: false }
 });
 
-// --- ⚠️ HARDCODED CREDENTIALS (FINAL) ---
+// ✅ SECURE: Now using Environment Variables
 const twilioClient = twilio(
-  "AC7d8f7e1f30d44152be1365d7398d918d".trim(), 
-  "7db0ba4dd3585fe93afba506dcf2a9cf".trim() 
+  process.env.TWILIO_SID, 
+  process.env.TWILIO_TOKEN 
 );
 
 // ==========================================
@@ -143,7 +143,7 @@ app.get('/api/maps/token', (req, res) => {
     res.json({ token: MAPS_TOKENS[domain] || MAPS_TOKENS["default"] });
 });
 
-// ✅ SMS DISPATCH ROUTE (Uses Texting instead of Voice)
+// ✅ SMS DISPATCH ROUTE (Secure Version)
 app.post('/api/admin/dispatch-radio', async (req, res) => {
     console.log("📨 SMS DISPATCH REQUEST RECEIVED");
     try {
@@ -160,11 +160,11 @@ app.post('/api/admin/dispatch-radio', async (req, res) => {
 
         console.log(`📱 Texting Cleaned Number: ${cleanPhone}`);
 
-        // ✅ Send SMS using Verified Toll-Free Number
+        // ✅ Send SMS using Variable from Railway
         await twilioClient.messages.create({
             body: `JOCO DISPATCH: ${message}`, 
             to: cleanPhone,
-            from: "+18558121783" 
+            from: process.env.TWILIO_PHONE // Uses Railway Variable now
         });
 
         res.json({ success: true, message: "SMS Dispatch sent" });
@@ -371,5 +371,4 @@ app.use('/api', (req, res) => res.status(404).json({ error: "API route not found
 // Catch-All Regex
 app.get(/.*/, (req, res) => res.sendFile(path.join(clientPath, 'index.html')));
 
-// ✅ Startup Log to confirm update
-app.listen(PORT, '0.0.0.0', () => console.log(`✅ SERVER RESTARTED - FINAL KEYS LOADED on Port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server Running on Port ${PORT}`));
