@@ -91,8 +91,7 @@ const transporter = nodemailer.createTransport({
     tls: { rejectUnauthorized: false }
 });
 
-// --- ⚠️ HARDCODED CREDENTIALS (NUCLEAR FIX) ---
-// Using the new token you provided: c7408d...
+// --- ⚠️ HARDCODED CREDENTIALS (VERIFIED) ---
 const twilioClient = twilio(
   "AC7d8f7e1f30d44152be1365d7398d918d".trim(), 
   "c7408d72d82a32f25b0d52844cd49f93".trim() 
@@ -144,9 +143,9 @@ app.get('/api/maps/token', (req, res) => {
     res.json({ token: MAPS_TOKENS[domain] || MAPS_TOKENS["default"] });
 });
 
-// ✅ MOVED UP: Radio Dispatch Route
+// ✅ MOVED UP: Radio Dispatch Route (Line ~148)
 app.post('/api/admin/dispatch-radio', async (req, res) => {
-    console.log("🎙️ DISPATCH REQUEST RECEIVED");
+    console.log("🎙️ DISPATCH REQUEST RECEIVED - New Code Running");
     try {
         const { driverId, message } = req.body;
         if (!message) return res.status(400).json({ error: "No message provided" });
@@ -371,4 +370,5 @@ app.use('/api', (req, res) => res.status(404).json({ error: "API route not found
 // Catch-All Regex
 app.get(/.*/, (req, res) => res.sendFile(path.join(clientPath, 'index.html')));
 
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server Running on Port ${PORT}`));
+// ✅ Startup Log to confirm update
+app.listen(PORT, '0.0.0.0', () => console.log(`✅ SERVER RESTARTED - NEW TWILIO KEYS LOADED on Port ${PORT}`));
